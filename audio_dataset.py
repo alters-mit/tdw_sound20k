@@ -44,6 +44,30 @@ class AudioDataset(Controller):
                                              4: 32,
                                              5: 11,
                                              6: 1})
+
+        # Screen resolutions.
+        self.screen_sizes = WeightedCollection(tuple)
+        self.screen_sizes.add_many({(1280, 720): 6,
+                                    (640, 480): 4,
+                                    (256, 256): 1,
+                                    (512, 512): 1})
+        # Render qualities.
+        self.render_qualities = WeightedCollection(int)
+        self.render_qualities.add_many({5: 5,
+                                        1: 1})
+        # Look at the centroid of the falling objects.
+        self.look_at = WeightedCollection(bool)
+        self.look_at.add_many({True: 1,
+                               False: 2})
+        # Focus on the falling objects.
+        # TODO default focus, unfocused, reset focus.
+
+        # Post-processing.
+        # TODO default post-processing, no post-processing, bad post-processing.
+
+        # Resonance audio
+        # TODO is it allowed? Get an init and a command.
+
         super().__init__(port=port)
 
     def trial(self) -> None:
