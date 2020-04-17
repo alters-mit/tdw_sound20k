@@ -97,6 +97,21 @@ class CornerSound20k(_ProcGenRoom):
     The "center" is offset to a corner.
     """
 
+    def get_commands(self, c: Controller) -> List[dict]:
+        commands = super().get_commands(c)
+        # Set the wall material too.
+        mat_name = ""
+        for cmd in commands:
+            if cmd["$type"] == "set_proc_gen_floor_material":
+                mat_name = cmd["name"]
+                break
+        assert mat_name != ""
+        commands.extend([{"$type": "set_proc_gen_walls_material",
+                          "name": mat_name},
+                         {"$type": "set_proc_gen_walls_texture_scale",
+                          "scale": {"x": 8, "y": 8}}])
+        return commands
+
     def _get_floor_material(self, lib: MaterialLibrarian) -> MaterialRecord:
         wood_materials = lib.get_all_materials_of_type("Wood")
         return wood_materials[RNG.randint(0, len(wood_materials))]
