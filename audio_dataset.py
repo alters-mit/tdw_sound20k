@@ -13,14 +13,14 @@ from platform import system
 from time import sleep
 from json import dumps
 from abc import ABC, abstractmethod
-from scenes import CornerSound20k, FloorSound20k
+from scenes import *
 from weighted_collection import WeightedCollection
 
 RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    SCENES = [CornerSound20k, FloorSound20k]
+    SCENES = [StairRamp]
 
     def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
         assert system() == "Windows", "This controller only works in Windows."
@@ -111,4 +111,6 @@ class AudioDataset(Controller):
                     done = rigidbodies.get_sleeping(i)
             if not done:
                 resp = self.communicate([])
-        self.communicate({"$type": "destroy_all_objects"})
+        # self.communicate({"$type": "destroy_all_objects"})
+
+AudioDataset().trial()

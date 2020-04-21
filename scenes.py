@@ -4,6 +4,7 @@ from tdw.librarian import MaterialLibrarian, MaterialRecord
 import numpy as np
 from typing import List, Dict
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 RNG = np.random.RandomState(0)
 
@@ -12,6 +13,12 @@ class _Scene(ABC):
     """
     A recipe to initialize a scene.
     """
+
+    _MODEL_LIBRARY_PATH = str(Path("models/models.json").resolve())
+
+    def __init__(self):
+        # A list of object IDs for the scene objects and the model names.
+        self.object_ids: Dict[int, str] = {}
 
     @abstractmethod
     def get_commands(self, c: Controller) -> List[dict]:
@@ -118,3 +125,129 @@ class CornerSound20k(_ProcGenRoom):
 
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 4, "y": 0, "z": 4}
+
+
+class _FloorWithObject(FloorSound20k):
+    """
+    Simple Sound20K floor scene with a single object in the center of the room.
+    """
+
+    @abstractmethod
+    def _get_model_name(self) -> str:
+        """
+        :return: The name of the model.
+        """
+
+        raise Exception()
+
+    @abstractmethod
+    def _get_model_scale(self) -> Dict[str, float]:
+        """
+        :return: The scale of the object as a Vector3.
+        """
+
+        raise Exception()
+
+    @abstractmethod
+    def _get_library(self) -> str:
+        """
+        :return: The library .json file path.
+        """
+
+        raise Exception()
+
+    def get_commands(self, c: Controller) -> List[dict]:
+        model_name = self._get_model_name()
+        o_id = c.get_unique_id()
+        self.object_ids.update({o_id: model_name})
+        commands = super().get_commands(c)
+        commands.extend([c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
+                         {"$type": "scale_object",
+                          "id": o_id,
+                          "scale_factor": self._get_model_scale()},
+                         {"$type": "set_mass",
+                          "id": o_id,
+                          "mass": 1000}])
+        return commands
+
+
+class LargeBowl(_FloorWithObject):
+    """
+    A large ceramic bowl.
+    """
+
+    def _get_model_name(self) -> str:
+        return "int_kitchen_accessories_le_creuset_bowl_30cm"
+
+    def _get_library(self) -> str:
+        return "models_full.json"
+
+    def _get_model_scale(self) -> Dict[str, float]:
+        return {"x": 6, "y": 6, "z": 6}
+
+
+class Ramp(_FloorWithObject):
+    """
+    A simple ramp.
+    """
+
+    def _get_model_name(self) -> str:
+        return "ramp_with_platform"
+
+    def _get_model_scale(self) -> Dict[str, float]:
+        return {"x": 1, "y": 1, "z": 1}
+
+    def _get_library(self) -> str:
+        return "models_special.json"
+
+
+class RoundTable(_FloorWithObject):
+    """
+    A large round wooden table.
+    """
+
+    def _get_model_name(self) -> str:
+        return "enzo_industrial_loft_pine_metal_round_dining_table"
+
+    def _get_library(self) -> str:
+        return "models_full.json"
+
+    def _get_model_scale(self) -> Dict[str, float]:
+        return {"x": 1, "y": 1, "z": 1}
+
+
+class StairRamp(_FloorWithObject):
+    """
+    A simple staircase.
+    """
+
+    def _get_model_name(self) -> str:
+        return "stair_ramp"
+
+    def _get_model_scale(self) -> Dict[str, float]:
+        return {"x": 1, "y": 1, "z": 1}
+
+    def _get_library(self) -> str:
+        return _Scene._MODEL_LIBRARY_PATH
+
+    def get_commands(self, c: Controller) -> List[dict]:
+        commands = super().get_commands(c)
+        commands.append({"$type": "teleport_object",
+                         "id": list(self.object_ids.keys())[0],
+                         "position": {"x": 0, "y": 0, "z": -0.25}})
+        return commands
+
+
+class UnevenTerrain(_Scene):
+    """
+    Load an outdoor scene with uneven terrain.
+    """
+
+    def get_center(self, c: Controller) -> Dict[str, float]:
+        return TDWUtils.VECTOR3_ZERO
+
+    def get_max_y(self) -> float:
+        return 4
+
+    def get_commands(self, c: Controller) -> List[dict]:
+        return [c.get_add_scene(scene_name="building_site")]
