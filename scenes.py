@@ -1,8 +1,9 @@
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.librarian import MaterialLibrarian, MaterialRecord, ModelLibrarian
+from tdw.py_impact import PyImpact
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -19,6 +20,13 @@ class _Scene(ABC):
     def __init__(self):
         # A list of object IDs for the scene objects and the model names.
         self.object_ids: Dict[int, str] = {}
+
+        self.object_info = PyImpact.get_object_info()
+
+        # Append custom data.
+        custom_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
+        for obj in custom_object_info:
+            self.object_info.update({obj: custom_object_info[obj]})
 
     @abstractmethod
     def get_commands(self, c: Controller) -> List[dict]:
@@ -47,6 +55,33 @@ class _Scene(ABC):
         """
 
         raise Exception()
+
+    def _init_object(self, c: Controller, name: str, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
+        """
+        :param c: The controller.
+        :param name: The name of the model.
+        :param pos: The initial position of the model.
+        :param rot: The initial rotation of the model.
+
+        :return: A list of commands to instantiate an object from ObjectInfo values.
+        """
+
+        o_id = c.get_unique_id()
+        self.object_ids.update({o_id: name})
+        info = self.object_info[name]
+        return [c.get_add_object(name,
+                                 object_id=o_id,
+                                 position=pos,
+                                 rotation=rot,
+                                 library=info.library),
+                {"$type": "set_mass",
+                 "id": o_id,
+                 "mass": info.mass},
+                {"$type": "set_physic_material",
+                 "id": o_id,
+                 "bounciness": info.bounciness,
+                 "static_friction": 0.1,
+                 "dynamic_friction": 0.8}]
 
 
 class _ProcGenRoom(_Scene):
@@ -167,7 +202,12 @@ class _FloorWithObject(FloorSound20k):
                           "scale_factor": self._get_model_scale()},
                          {"$type": "set_mass",
                           "id": o_id,
-                          "mass": 1000}])
+                          "mass": 1000},
+                         {"$type": "set_physic_material",
+                          "id": o_id,
+                          "bounciness": self.object_info[model_name].bounciness,
+                          "static_friction": 0.1,
+                          "dynamic_friction": 0.8}])
         return commands
 
 
@@ -262,45 +302,44 @@ class DiningTableAndChairs(FloorSound20k):
         c.model_librarian = ModelLibrarian("models_full.json")
         # Initialize the scene.
         commands = super().get_commands(c)
-        table_id = c.get_unique_id()
-        table_name = "quatre_dining_table"
-        self.object_ids.update({table_id: table_name})
+        chair_name = "brown_leather_dining_chair"
         # Create the the table.
-        commands.extend([c.get_add_object("quatre_dining_table",
-                                          object_id=table_id),
-                         {"$type": "set_mass",
-                          "id": table_id,
-                          "mass": 250}])
+        commands.extend(self._init_object(c=c,
+                                          name="quatre_dining_table",
+                                          pos=TDWUtils.VECTOR3_ZERO,
+                                          rot=TDWUtils.VECTOR3_ZERO))
         # Create 8 chairs around the table.
-        commands.extend(self._get_chair(c, pos={"x": 0, "y": 0, "z": -1.55}, rot={"x": 0, "y": 0, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": 0, "y": 0, "z": 1.55}, rot={"x": 0, "y": 180, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": -0.85}, rot={"x": 0, "y": 90, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": 0}, rot={"x": 0, "y": 90, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": 0.85}, rot={"x": 0, "y": 90, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": -0.85}, rot={"x": 0, "y": -90, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": 0}, rot={"x": 0, "y": -90, "z": 0}))
-        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": 0.85}, rot={"x": 0, "y": -90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": 0, "y": 0, "z": -1.55},
+                                          rot={"x": 0, "y": 0, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": 0, "y": 0, "z": 1.55},
+                                          rot={"x": 0, "y": 180, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": -1, "y": 0, "z": -0.85},
+                                          rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": -1, "y": 0, "z": 0},
+                                          rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": -1, "y": 0, "z": 0.85},
+                                          rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": 1, "y": 0, "z": -0.85},
+                                          rot={"x": 0, "y": -90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": 1, "y": 0, "z": 0},
+                                          rot={"x": 0, "y": -90, "z": 0}))
+        commands.extend(self._init_object(c=c,
+                                          name=chair_name,
+                                          pos={"x": 1, "y": 0, "z": 0.85},
+                                          rot={"x": 0, "y": -90, "z": 0}))
 
         return commands
-
-    def _get_chair(self, c: Controller, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
-        """
-        Get commands to create a chair. Store the object ID.
-
-        :param c: The controller.
-        :param pos: The position of the chair.
-        :param rot: The rotation of the chair.
-
-        :return: A list of commands to create a chair.
-        """
-
-        model_name = "brown_leather_dining_chair"
-        o_id = c.get_unique_id()
-        self.object_ids.update({o_id: model_name})
-        return [c.get_add_object(model_name,
-                                 object_id=o_id,
-                                 position=pos,
-                                 rotation=rot),
-                {"$type": "set_mass",
-                 "id": o_id,
-                 "mass": 35}]
