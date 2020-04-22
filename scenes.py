@@ -108,7 +108,7 @@ class _ProcGenRoom(_Scene):
                  "scale": {"x": 8, "y": 8}},
                 {"$type": "set_proc_gen_walls_scale",
                  "walls": TDWUtils.get_box(12, 12),
-                 "scale": {"x": 1, "y": 3, "z": 1}}
+                 "scale": {"x": 1, "y": 4, "z": 1}}
                 ]
 
     @abstractmethod
@@ -122,7 +122,7 @@ class _ProcGenRoom(_Scene):
         raise Exception()
 
     def get_max_y(self) -> float:
-        return 4.5
+        return 3.5
 
 
 class FloorSound20k(_ProcGenRoom):
