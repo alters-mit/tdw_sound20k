@@ -1,8 +1,9 @@
 from tdw.py_impact import PyImpact, CollisionInfo, ObjectInfo
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
+from tdw.py_impact import PyImpact, AudioMaterial
 from tdw.librarian import ModelLibrarian, ModelRecord, MaterialLibrarian, MaterialRecord
-from tdw.output_data import OutputData, Environments, Rigidbodies
+from tdw.output_data import OutputData, Environments, Rigidbodies, Bounds
 import itertools
 import numpy as np
 from pathlib import Path
@@ -13,15 +14,12 @@ from platform import system
 from time import sleep
 from json import dumps
 from abc import ABC, abstractmethod
-from scenes import *
-from weighted_collection import WeightedCollection
+from scenes import SOUND20K
 
 RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    SCENES = [DeskAndChair]
-
     def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
         assert system() == "Windows", "This controller only works in Windows."
 
@@ -30,87 +28,162 @@ class AudioDataset(Controller):
             self.output_dir.mkdir(parents=True)
 
         self.total_num = total_num
+        self.py_impact = PyImpact()
 
-        object_info_dict = PyImpact.get_object_info()
-        self.object_info: List[ObjectInfo] = []
-        for name in object_info_dict:
-            if object_info_dict[name].mass < 10:
-                self.object_info.append(object_info_dict[name])
-
-        self.num_objects_per_trial = WeightedCollection(int)
-        self.num_objects_per_trial.add_many({1: 1,
-                                             2: 14,
-                                             3: 41,
-                                             4: 32,
-                                             5: 11,
-                                             6: 1})
-
-        # Screen resolutions.
-        self.screen_sizes = WeightedCollection(tuple)
-        self.screen_sizes.add_many({(1280, 720): 6,
-                                    (640, 480): 4,
-                                    (256, 256): 1,
-                                    (512, 512): 1})
-        # Render qualities.
-        self.render_qualities = WeightedCollection(int)
-        self.render_qualities.add_many({5: 5,
-                                        1: 1})
-        # Look at the centroid of the falling objects.
-        self.look_at = WeightedCollection(bool)
-        self.look_at.add_many({True: 1,
-                               False: 2})
-        # Focus on the falling objects.
-        # TODO default focus, unfocused, reset focus.
-
-        # Post-processing.
-        # TODO default post-processing, no post-processing, bad post-processing.
+        self.object_info = PyImpact.get_object_info()
 
         # Resonance audio
         # TODO is it allowed? Get an init and a command.
 
         super().__init__(port=port)
 
+        # Global settings.
+        self.communicate([{"$type": "set_screen_size",
+                           "width": 128,
+                           "height": 128},
+                          {"$type": "set_post_process",
+                           "value": False},
+                          {"$type": "set_render_quality",
+                           "render_quality": 1},
+                          {"$type": "set_shadows",
+                           "value": False}])
+
     def trial(self) -> None:
-        scene = AudioDataset.SCENES[RNG.randint(0, len(AudioDataset.SCENES))]()
-        self.communicate(scene.get_commands(self))
+        scene = SOUND20K[RNG.randint(0, len(SOUND20K))]()
+        init_commands = scene.get_commands(self)
+        init_commands.append({"$type": "send_bounds",
+                              "frequency": "once"})
+        resp = self.communicate(init_commands)
         center = scene.get_center(self)
 
-        obj = self.object_info[RNG.randint(0, len(self.object_info))]
+        obj_name = list(self.object_info.keys())[RNG.randint(0, len(self.object_info))]
+        obj_info = self.object_info[obj_name]
         max_y = scene.get_max_y()
-        y = RNG.uniform(max_y - 0.5, max_y)
+        o_x = RNG.uniform(center["x"] - 0.05, center["x"] + 0.05)
+        o_y = RNG.uniform(max_y - 0.5, max_y)
+        o_z = RNG.uniform(center["z"] - 0.05, center["z"] + 0.05)
         o_id = 0
-        resp = self.communicate([self.get_add_object(obj.name, object_id=o_id, library=obj.library,
-                                                     position={"x": center["x"], "y": y, "z": center["z"]}),
-                                 {"$type": "set_mass",
-                                  "id": o_id,
-                                  "mass": obj.mass},
-                                 {"$type": "set_physic_material",
-                                  "id": o_id,
-                                  "bounciness": obj.bounciness,
-                                  "static_friction": 0.1,
-                                  "dynamic_friction": 0.8},
-                                 {"$type": "rotate_object_by",
-                                  "angle": RNG.uniform(0, 20),
-                                  "id": o_id,
-                                  "axis": "pitch",
-                                  "is_world": True},
-                                 {"$type": "apply_force_magnitude_to_object",
-                                  "magnitude": RNG.uniform(0, 2),
-                                  "id": o_id},
-                                 {"$type": "send_rigidbodies",
-                                  "frequency": "always"}])
+        # Create the object and apply a force.
+        commands = [self.get_add_object(obj_name, object_id=o_id, library=obj_info.library,
+                                        position={"x": o_x, "y": o_y, "z": o_z}),
+                    {"$type": "set_mass",
+                     "id": o_id,
+                     "mass": obj_info.mass},
+                    {"$type": "set_physic_material",
+                     "id": o_id,
+                     "bounciness": obj_info.bounciness,
+                     "static_friction": 0.1,
+                     "dynamic_friction": 0.8},
+                    {"$type": "rotate_object_by",
+                     "angle": RNG.uniform(0, 20),
+                     "id": o_id,
+                     "axis": "pitch",
+                     "is_world": True},
+                    {"$type": "apply_force_magnitude_to_object",
+                     "magnitude": RNG.uniform(0, 2),
+                     "id": o_id},
+                    {"$type": "send_rigidbodies",
+                     "frequency": "always"},
+                    {"$type": "send_collisions",
+                     "enter": True,
+                     "exit": False,
+                     "stay": False,
+                     "collision_types": ["obj", "env"]}]
+        # Parse bounds data to get the centroid of all objects currently in the scene.
+        bounds = Bounds(resp[0])
+        if bounds.get_num() == 0:
+            look_at = {"x": center["x"], "y": 0.1, "z": center["z"]}
+        else:
+            centers = []
+            for i in range(bounds.get_num()):
+                centers.append(bounds.get_center(i))
+            centers_x, centers_y, centers_z = zip(*centers)
+            centers_len = len(centers_x)
+            look_at = {"x": sum(centers_x) / centers_len,
+                       "y": sum(centers_y) / centers_len,
+                       "z": sum(centers_z) / centers_len}
+        # Add the avatar.
+        r = RNG.uniform(2.3, 2.6)
+        a_x = center["x"] + r
+        a_y = RNG.uniform(1.8, 2.2)
+        a_z = center["y"] + r
+        cam_angle_min, cam_angle_max = scene.get_camera_angles()
+        theta = RNG.uniform(cam_angle_min, cam_angle_max)
+        rad = np.radians(theta)
+        a_x = np.cos(rad) * (a_x - center["x"]) - np.sin(rad) * (a_z - center["z"]) + center["x"]
+        a_z = np.sin(rad) * (a_x - center["x"]) + np.cos(rad) * (a_z - center["z"]) + center["z"]
+        commands.extend(TDWUtils.create_avatar(position={"x": a_x, "y": a_y, "z": a_z},
+                                               look_at=look_at))
+        resp = self.communicate(commands)
         done = False
+        collision_infos: Dict[int, CollisionInfo] = {}
         while not done:
-            rigidbodies: Optional[Rigidbodies] = None
-            for r in resp[:-1]:
-                r_id = OutputData.get_data_type_id(r)
-                if r_id == "rigi":
-                    rigidbodies = Rigidbodies(r)
-            for i in range(rigidbodies.get_num()):
-                if rigidbodies.get_id(i) == o_id:
-                    done = rigidbodies.get_sleeping(i)
+            commands = []
+            collisions, environment_collisions, rigidbodies = PyImpact.get_collisions(resp)
+            for collision in collisions:
+                if PyImpact.is_valid_collision(collision):
+                    # Get the audio material and amp.
+                    collider_id = collision.get_collider_id()
+                    collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
+                    collidee_id = collision.get_collider_id()
+                    collidee_material, collidee_amp = self._get_object_info(collidee_id, scene.object_ids, obj_name)
+                    if collidee_id not in collision_infos:
+                        collision_infos.update({collidee_id: CollisionInfo()})
+                    impact_sound_command, collision_infos[collidee_id] = self.py_impact.get_impact_sound_command(
+                        collision=collision,
+                        rigidbodies=rigidbodies,
+                        id1=collider_id,
+                        mat1=collider_material.name,
+                        id2=collidee_id,
+                        mat2=collidee_material.name,
+                        amp2re1=collider_amp / collidee_amp,
+                        coll_info=collision_infos[collidee_id],
+                        target_id=collidee_id)
+                    commands.append(impact_sound_command)
+            # Handle environment collision.
+            for collision in environment_collisions:
+                collider_id = collision.get_object_id()
+                collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
+                surface_material = scene.get_surface_material()
+                if collider_id not in collision_infos:
+                    collision_infos.update({collider_id: CollisionInfo()})
+                impact_sound_command, collision_infos[collider_id] = self.py_impact.get_impact_sound_command(
+                    collision=collision,
+                    rigidbodies=rigidbodies,
+                    id1=collider_id,
+                    mat1=collider_material.name,
+                    id2=-1,
+                    mat2=surface_material.name,
+                    amp2re1=collider_amp / 0.5,
+                    coll_info=collision_infos[collider_id],
+                    target_id=collider_id)
+                commands.append(impact_sound_command)
+            # If there were no collisions, check for movement.
+            if len(commands) == 0:
+                done = True
+                for i in range(rigidbodies.get_num()):
+                    if not rigidbodies.get_sleeping(i):
+                        done = False
+                        break
+            # Continue the trial.
             if not done:
-                resp = self.communicate([])
-        # self.communicate({"$type": "destroy_all_objects"})
+                self.communicate(commands)
+
+        self.communicate({"$type": "destroy_all_objects"})
+
+    def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
+        """
+        :param o_id: The object ID.
+        :param object_ids: The scene object IDs.
+        :param drop_name: The name of the dropped object.
+
+        :return: The audio material and amp associated with the object.
+        """
+
+        if o_id in object_ids:
+            return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
+        else:
+            return self.object_info[drop_name].material, self.object_info[drop_name].amp
+
 
 AudioDataset().trial()

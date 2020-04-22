@@ -1,7 +1,7 @@
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.librarian import MaterialLibrarian, MaterialRecord, ModelLibrarian
-from tdw.py_impact import PyImpact
+from tdw.py_impact import PyImpact, AudioMaterial
 import numpy as np
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
@@ -91,6 +91,14 @@ class _Scene(ABC):
 
         return 0, 360
 
+    @abstractmethod
+    def get_surface_material(self) -> AudioMaterial:
+        """
+        :return: The audio material of the surface.
+        """
+
+        raise Exception()
+
 
 class _ProcGenRoom(_Scene):
     """
@@ -115,8 +123,7 @@ class _ProcGenRoom(_Scene):
                  "scale": {"x": 8, "y": 8}},
                 {"$type": "set_proc_gen_walls_scale",
                  "walls": TDWUtils.get_box(12, 12),
-                 "scale": {"x": 1, "y": 4, "z": 1}}
-                ]
+                 "scale": {"x": 1, "y": 4, "z": 1}}]
 
     @abstractmethod
     def _get_floor_material(self, lib: MaterialLibrarian) -> MaterialRecord:
@@ -130,6 +137,9 @@ class _ProcGenRoom(_Scene):
 
     def get_max_y(self) -> float:
         return 3.5
+
+    def get_surface_material(self) -> AudioMaterial:
+        return AudioMaterial.hardwood
 
 
 class FloorSound20k(_ProcGenRoom):
@@ -308,6 +318,9 @@ class UnevenTerrain(_Scene):
     def get_commands(self, c: Controller) -> List[dict]:
         return [c.get_add_scene(scene_name="building_site")]
 
+    def get_surface_material(self) -> AudioMaterial:
+        return AudioMaterial.cardboard
+
 
 class DiningTableAndChairs(FloorSound20k):
     """
@@ -409,3 +422,6 @@ class DeskAndChair(FloorSound20k):
                           "id": shelf_id,
                           "scale_factor": {"x": 1, "y": 1.5, "z": 1.8}}])
         return commands
+
+
+SOUND20K = [FloorSound20k, CornerSound20k, LargeBowl, Ramp, StairRamp, UnevenTerrain, DiningTableAndChairs, DeskAndChair]
