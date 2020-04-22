@@ -1,6 +1,6 @@
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
-from tdw.librarian import MaterialLibrarian, MaterialRecord
+from tdw.librarian import MaterialLibrarian, MaterialRecord, ModelLibrarian
 import numpy as np
 from typing import List, Dict
 from abc import ABC, abstractmethod
@@ -82,7 +82,7 @@ class _ProcGenRoom(_Scene):
         raise Exception()
 
     def get_max_y(self) -> float:
-        return 2
+        return 3.5
 
 
 class FloorSound20k(_ProcGenRoom):
@@ -251,3 +251,53 @@ class UnevenTerrain(_Scene):
 
     def get_commands(self, c: Controller) -> List[dict]:
         return [c.get_add_scene(scene_name="building_site")]
+
+
+class DiningTableAndChairs(FloorSound20k):
+    """
+    A dining table with 8 chairs around it.
+    """
+
+    def get_commands(self, c: Controller) -> List[dict]:
+        c.model_librarian = ModelLibrarian("models_full.json")
+        # Initialize the scene.
+        commands = super().get_commands(c)
+        # Create the the table.
+        commands.extend([c.get_add_object("quatre_dining_table",
+                                          object_id=100),
+                         {"$type": "set_mass",
+                          "id": 100,
+                          "mass": 250}])
+        # Create 8 chairs around the table.
+        commands.extend(self._get_chair(c, pos={"x": 0, "y": 0, "z": -1.55}, rot={"x": 0, "y": 0, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": 0, "y": 0, "z": 1.55}, rot={"x": 0, "y": 180, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": -0.85}, rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": 0}, rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": -1, "y": 0, "z": 0.85}, rot={"x": 0, "y": 90, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": -0.85}, rot={"x": 0, "y": -90, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": 0}, rot={"x": 0, "y": -90, "z": 0}))
+        commands.extend(self._get_chair(c, pos={"x": 1, "y": 0, "z": 0.85}, rot={"x": 0, "y": -90, "z": 0}))
+
+        return commands
+
+    def _get_chair(self, c: Controller, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
+        """
+        Get commands to create a chair. Store the object ID.
+
+        :param c: The controller.
+        :param pos: The position of the chair.
+        :param rot: The rotation of the chair.
+
+        :return: A list of commands to create a chair.
+        """
+
+        model_name = "brown_leather_dining_chair"
+        o_id = c.get_unique_id()
+        self.object_ids.update({o_id: model_name})
+        return [c.get_add_object(model_name,
+                                 object_id=o_id,
+                                 position=pos,
+                                 rotation=rot),
+                {"$type": "set_mass",
+                 "id": o_id,
+                 "mass": 35}]

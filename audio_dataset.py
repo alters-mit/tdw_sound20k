@@ -20,7 +20,7 @@ RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    SCENES = [StairRamp]
+    SCENES = [DiningTableAndChairs]
 
     def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
         assert system() == "Windows", "This controller only works in Windows."
