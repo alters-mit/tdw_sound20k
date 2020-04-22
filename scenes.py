@@ -9,6 +9,7 @@ from pathlib import Path
 
 RNG = np.random.RandomState(0)
 
+#TODO valid camera angles.
 
 class _Scene(ABC):
     """
@@ -104,7 +105,11 @@ class _ProcGenRoom(_Scene):
                 {"$type": "set_proc_gen_floor_material",
                  "name": material.name},
                 {"$type": "set_proc_gen_floor_texture_scale",
-                 "scale": {"x": 8, "y": 8}}]
+                 "scale": {"x": 8, "y": 8}},
+                {"$type": "set_proc_gen_walls_scale",
+                 "walls": TDWUtils.get_box(12, 12),
+                 "scale": {"x": 1, "y": 3, "z": 1}}
+                ]
 
     @abstractmethod
     def _get_floor_material(self, lib: MaterialLibrarian) -> MaterialRecord:
@@ -117,7 +122,7 @@ class _ProcGenRoom(_Scene):
         raise Exception()
 
     def get_max_y(self) -> float:
-        return 3.5
+        return 4.5
 
 
 class FloorSound20k(_ProcGenRoom):
@@ -342,4 +347,50 @@ class DiningTableAndChairs(FloorSound20k):
                                           pos={"x": 1, "y": 0, "z": 0.85},
                                           rot={"x": 0, "y": -90, "z": 0}))
 
+        return commands
+
+
+class DeskAndChair(FloorSound20k):
+    """
+    A desk, a chair, and a shelf with some boxes, facing a wall.
+    """
+
+    def get_center(self, c: Controller) -> Dict[str, float]:
+        return {"x": 0, "y": 0, "z": 3.8}
+
+    def get_commands(self, c: Controller) -> List[dict]:
+        c.model_librarian = ModelLibrarian("models_full.json")
+        commands = super().get_commands(c)
+        # Add a table, chair, and boxes.
+        commands.extend(self._init_object(c, "b05_table_new",
+                                          pos={"x": 0, "y": 0, "z": 4.33},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "chair_willisau_riale",
+                                          pos={"x": 0, "y": 0, "z": 3.7},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "iron_box",
+                                          pos={"x": 0.13, "y": 0.65, "z": 4.83},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "iron_box",
+                                          pos={"x": -0.285, "y": 1.342, "z": 4.79},
+                                          rot={"x": 90, "y": 0, "z": 0}))
+        # Add a shelf with a custom scale.
+        shelf_id = c.get_unique_id()
+        shelf_name = "metal_lab_shelf"
+        self.object_ids.update({shelf_id: shelf_name})
+        commands.extend([c.get_add_object(shelf_name,
+                         object_id=shelf_id,
+                         rotation={"x": 0, "y": -90, "z": 0},
+                         position={"x": 0, "y": 0, "z": 4.93}),
+                         {"$type": "set_mass",
+                          "id": shelf_id,
+                          "mass": 400},
+                         {"$type": "set_physic_material",
+                          "id": shelf_id,
+                          "bounciness": self.object_info[shelf_name].bounciness,
+                          "static_friction": 0.1,
+                          "dynamic_friction": 0.8},
+                         {"$type": "scale_object",
+                          "id": shelf_id,
+                          "scale_factor": {"x": 1, "y": 1.5, "z": 1.8}}])
         return commands
