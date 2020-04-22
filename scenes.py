@@ -262,11 +262,14 @@ class DiningTableAndChairs(FloorSound20k):
         c.model_librarian = ModelLibrarian("models_full.json")
         # Initialize the scene.
         commands = super().get_commands(c)
+        table_id = c.get_unique_id()
+        table_name = "quatre_dining_table"
+        self.object_ids.update({table_id: table_name})
         # Create the the table.
         commands.extend([c.get_add_object("quatre_dining_table",
-                                          object_id=100),
+                                          object_id=table_id),
                          {"$type": "set_mass",
-                          "id": 100,
+                          "id": table_id,
                           "mass": 250}])
         # Create 8 chairs around the table.
         commands.extend(self._get_chair(c, pos={"x": 0, "y": 0, "z": -1.55}, rot={"x": 0, "y": 0, "z": 0}))
