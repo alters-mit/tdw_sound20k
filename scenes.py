@@ -9,7 +9,6 @@ from pathlib import Path
 
 RNG = np.random.RandomState(0)
 
-#TODO valid camera angles.
 
 class _Scene(ABC):
     """
@@ -83,6 +82,14 @@ class _Scene(ABC):
                  "bounciness": info.bounciness,
                  "static_friction": 0.1,
                  "dynamic_friction": 0.8}]
+
+    @staticmethod
+    def get_camera_angles() -> Tuple[float, float]:
+        """
+        :return: Range of valid camera angles.
+        """
+
+        return 0, 360
 
 
 class _ProcGenRoom(_Scene):
@@ -165,6 +172,10 @@ class CornerSound20k(_ProcGenRoom):
 
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 4, "y": 0, "z": 4}
+
+    @staticmethod
+    def get_camera_angles() -> Tuple[float, float]:
+        return 120, 250
 
 
 class _FloorWithObject(FloorSound20k):
@@ -357,6 +368,10 @@ class DeskAndChair(FloorSound20k):
 
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 0, "y": 0, "z": 3.8}
+
+    @staticmethod
+    def get_camera_angles() -> Tuple[float, float]:
+        return 270, 300
 
     def get_commands(self, c: Controller) -> List[dict]:
         c.model_librarian = ModelLibrarian("models_full.json")
