@@ -1,19 +1,12 @@
-from tdw.py_impact import PyImpact, CollisionInfo, ObjectInfo
+from tdw.py_impact import CollisionInfo
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.py_impact import PyImpact, AudioMaterial
-from tdw.librarian import ModelLibrarian, ModelRecord, MaterialLibrarian, MaterialRecord
-from tdw.output_data import OutputData, Environments, Rigidbodies, Bounds
-import itertools
+from tdw.output_data import Bounds
 import numpy as np
 from pathlib import Path
-from tqdm import tqdm
-from typing import Optional, List, Dict, Tuple
-from subprocess import Popen, call
+from typing import Dict, Tuple
 from platform import system
-from time import sleep
-from json import dumps
-from abc import ABC, abstractmethod
 from scenes import SOUND20K
 
 RNG = np.random.RandomState(0)
@@ -128,7 +121,7 @@ class AudioDataset(Controller):
                     collidee_id = collision.get_collider_id()
                     collidee_material, collidee_amp = self._get_object_info(collidee_id, scene.object_ids, obj_name)
                     if collidee_id not in collision_infos:
-                        collision_infos.update({collidee_id: CollisionInfo()})
+                        collision_infos.update({collidee_id: CollisionInfo(amp=collidee_amp)})
                     impact_sound_command, collision_infos[collidee_id] = self.py_impact.get_impact_sound_command(
                         collision=collision,
                         rigidbodies=rigidbodies,
