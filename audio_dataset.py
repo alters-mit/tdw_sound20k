@@ -1,4 +1,3 @@
-from tdw.py_impact import CollisionInfo
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.py_impact import PyImpact, AudioMaterial
@@ -109,7 +108,6 @@ class AudioDataset(Controller):
                                                look_at=look_at))
         resp = self.communicate(commands)
         done = False
-        collision_infos: Dict[int, CollisionInfo] = {}
         while not done:
             commands = []
             collisions, environment_collisions, rigidbodies = PyImpact.get_collisions(resp)
@@ -120,36 +118,30 @@ class AudioDataset(Controller):
                     collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
                     collidee_id = collision.get_collider_id()
                     collidee_material, collidee_amp = self._get_object_info(collidee_id, scene.object_ids, obj_name)
-                    if collidee_id not in collision_infos:
-                        collision_infos.update({collidee_id: CollisionInfo(amp=collidee_amp)})
-                    impact_sound_command, collision_infos[collidee_id] = self.py_impact.get_impact_sound_command(
+                    impact_sound_command = self.py_impact.get_impact_sound_command(
                         collision=collision,
                         rigidbodies=rigidbodies,
-                        id1=collider_id,
-                        mat1=collider_material.name,
-                        id2=collidee_id,
-                        mat2=collidee_material.name,
-                        amp2re1=collider_amp / collidee_amp,
-                        coll_info=collision_infos[collidee_id],
-                        target_id=collidee_id)
+                        target_id=collidee_id,
+                        target_amp=collidee_amp,
+                        target_mat=collidee_material.name,
+                        other_id=collider_id,
+                        other_mat=collider_material.name,
+                        other_amp=collider_amp)
                     commands.append(impact_sound_command)
             # Handle environment collision.
             for collision in environment_collisions:
                 collider_id = collision.get_object_id()
                 collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
                 surface_material = scene.get_surface_material()
-                if collider_id not in collision_infos:
-                    collision_infos.update({collider_id: CollisionInfo()})
-                impact_sound_command, collision_infos[collider_id] = self.py_impact.get_impact_sound_command(
+                impact_sound_command = self.py_impact.get_impact_sound_command(
                     collision=collision,
                     rigidbodies=rigidbodies,
-                    id1=collider_id,
-                    mat1=collider_material.name,
-                    id2=-1,
-                    mat2=surface_material.name,
-                    amp2re1=collider_amp / 0.5,
-                    coll_info=collision_infos[collider_id],
-                    target_id=collider_id)
+                    target_id=collider_id,
+                    target_amp=collider_amp,
+                    target_mat=collider_material.name,
+                    other_id=-1,
+                    other_amp=0.5,
+                    other_mat=surface_material.name)
                 commands.append(impact_sound_command)
             # If there were no collisions, check for movement.
             if len(commands) == 0:
