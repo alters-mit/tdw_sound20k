@@ -1,76 +1,76 @@
 {
     "description": "Custom models for audio dataset",
     "records": {
-        "stair_ramp": {
+        "b03_boat_fishing_02_null_11": {
             "asset_bundle_sizes": {
-                "Darwin": 62522,
-                "Linux": 98403,
-                "Windows": 29491
+                "Darwin": 7290292,
+                "Linux": 7418792,
+                "Windows": 7186254
             },
             "bounds": {
                 "back": {
-                    "x": 0,
-                    "y": 2.5,
-                    "z": 0
+                    "x": -2.384186e-07,
+                    "y": 1.718975,
+                    "z": -0.7437265
                 },
                 "bottom": {
-                    "x": 0,
-                    "y": 0,
-                    "z": 7
+                    "x": -2.384186e-07,
+                    "y": -2.384186e-07,
+                    "z": -5.960464e-08
                 },
                 "center": {
-                    "x": 0,
-                    "y": 2.5,
-                    "z": 7
+                    "x": -2.384186e-07,
+                    "y": 1.718975,
+                    "z": -5.960464e-08
                 },
                 "front": {
-                    "x": 0,
-                    "y": 2.5,
-                    "z": 14
+                    "x": -2.384186e-07,
+                    "y": 1.718975,
+                    "z": 0.7437264
                 },
                 "left": {
-                    "x": -3.5,
-                    "y": 2.5,
-                    "z": 7
+                    "x": -2.54886,
+                    "y": 1.718975,
+                    "z": -5.960464e-08
                 },
                 "right": {
-                    "x": 3.5,
-                    "y": 2.5,
-                    "z": 7
+                    "x": 2.548859,
+                    "y": 1.718975,
+                    "z": -5.960464e-08
                 },
                 "top": {
-                    "x": 0,
-                    "y": 5,
-                    "z": 7
+                    "x": -2.384186e-07,
+                    "y": 3.437951,
+                    "z": -5.960464e-08
                 }
             },
             "canonical_rotation": {
                 "x": 0,
-                "y": 0,
+                "y": 0.0,
                 "z": 0
             },
             "composite_object": false,
             "do_not_use": false,
             "do_not_use_reason": "",
-            "flex": false,
-            "name": "stair_ramp",
+            "flex": true,
+            "name": "b03_boat_fishing_02_null_11",
             "physics_quality": -1,
-            "scale_factor": 0.2,
+            "scale_factor": 0.5,
             "substructure": [
                 {
                     "materials": [
-                        "defaultMat"
+                        "TEXTURE"
                     ],
-                    "name": "default"
+                    "name": "B03_boat_fishing_02_null_11"
                 }
             ],
             "urls": {
-                "Darwin": "models/stair_ramp/Darwin/stair_ramp",
-                "Linux": "models/stair_ramp/Linux/stair_ramp",
-                "Windows": "models/stair_ramp/Windows/stair_ramp"
+                "Darwin": "https://s3.amazonaws.com/tdw_test_dev/models/osx_2018/b03_boat_fishing_02_null_11",
+                "Linux": "https://s3.amazonaws.com/tdw_test_dev/models/linux_2018/b03_boat_fishing_02_null_11",
+                "Windows": "https://s3.amazonaws.com/tdw_test_dev/models/windows_2018/b03_boat_fishing_02_null_11"
             },
-            "wcategory": "stairs",
-            "wnid": "n04298171"
+            "wcategory": "boat",
+            "wnid": "n02858304"
         },
         "birdhouse_0": {
             "asset_bundle_sizes": {
@@ -744,6 +744,77 @@
             },
             "wcategory": "birdhouse",
             "wnid": "n02843684"
+        },
+        "stair_ramp": {
+            "asset_bundle_sizes": {
+                "Darwin": 62522,
+                "Linux": 98403,
+                "Windows": 29491
+            },
+            "bounds": {
+                "back": {
+                    "x": 0,
+                    "y": 2.5,
+                    "z": 0
+                },
+                "bottom": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 7
+                },
+                "center": {
+                    "x": 0,
+                    "y": 2.5,
+                    "z": 7
+                },
+                "front": {
+                    "x": 0,
+                    "y": 2.5,
+                    "z": 14
+                },
+                "left": {
+                    "x": -3.5,
+                    "y": 2.5,
+                    "z": 7
+                },
+                "right": {
+                    "x": 3.5,
+                    "y": 2.5,
+                    "z": 7
+                },
+                "top": {
+                    "x": 0,
+                    "y": 5,
+                    "z": 7
+                }
+            },
+            "canonical_rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "composite_object": false,
+            "do_not_use": false,
+            "do_not_use_reason": "",
+            "flex": false,
+            "name": "stair_ramp",
+            "physics_quality": -1,
+            "scale_factor": 0.2,
+            "substructure": [
+                {
+                    "materials": [
+                        "defaultMat"
+                    ],
+                    "name": "default"
+                }
+            ],
+            "urls": {
+                "Darwin": "models/stair_ramp/Darwin/stair_ramp",
+                "Linux": "models/stair_ramp/Linux/stair_ramp",
+                "Windows": "models/stair_ramp/Windows/stair_ramp"
+            },
+            "wcategory": "stairs",
+            "wnid": "n04298171"
         },
         "staircase_ramp": {
             "asset_bundle_sizes": {

@@ -9,6 +9,8 @@ from platform import system
 from scenes import SOUND20K, Scene
 from subprocess import Popen, call
 from time import sleep
+from json import loads
+from weighted_collection import WeightedCollection
 
 RNG = np.random.RandomState(0)
 
@@ -26,8 +28,16 @@ class AudioDataset(Controller):
 
         self.object_info = PyImpact.get_object_info()
 
-        # Resonance audio
-        # TODO is it allowed? Get an init and a command.
+        # Load model material data.
+        sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
+        self.sound20k_models = dict()
+        for key in sound20k_models:
+            # Convert the materials dictionary to a WeightedCollection.
+            model_materials = WeightedCollection()
+            model_materials.add_many(sound20k_models[key]["materials"])
+            self.sound20k_models.update({key: {"name": key,
+                                               "library": sound20k_models[key]["library"],
+                                               "materials": model_materials}})
 
         super().__init__(port=port)
 
@@ -42,24 +52,39 @@ class AudioDataset(Controller):
                           {"$type": "set_shadows",
                            "value": False}])
 
-    def init_scene(self) -> Scene:
+    def init_scene(self) -> Tuple[Scene, Path]:
         """
         Initialize a new scene.
 
-        :return: The scene that was initialized.
+        :return: The scene that was initialized, and the scene's output directory.
         """
 
         scene = SOUND20K[RNG.randint(0, len(SOUND20K))]()
         self.communicate(scene.initialize_scene(self))
 
-        return scene
+        output_dir = self.output_dir.joinpath(scene.get_output_directory())
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
 
-    def trial(self, scene: Scene) -> None:
+        return scene, output_dir
+
+    def trial(self, scene: Scene, output_dir: Path) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
+        :param output_dir: The root output directory for the scene.
         """
+
+        # Get a random object and a random material.
+        obj_name = list(self.sound20k_models.keys())[RNG.randint(0, len(self.sound20k_models))]
+        material = self.sound20k_models[obj_name]["materials"].get()
+
+        filename = output_dir.joinpath(obj_name + "_" + material.name + ".wav")
+        output_path = output_dir.joinpath(filename)
+        # Skip files that already exist.
+        if output_path.exists():
+            return
 
         # Reset the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.reset_scene(self))
@@ -127,11 +152,11 @@ class AudioDataset(Controller):
         commands.append(scene.audio_system.add_audio_sensor())
         # Send the commands.
         resp = self.communicate(commands)
-        # TODO output directory
-        recorder_pid = Popen(["fmedia", "--record", "--out=TEST.wav"]).pid
+
+        recorder_pid = Popen(["fmedia", "--record", f"--out={str(output_path.resolve())}"]).pid
         sleep(0.1)
+
         # Loop until all objects are sleeping.
-        # TODO metadata
         done = False
         while not done:
             commands = []
@@ -143,6 +168,11 @@ class AudioDataset(Controller):
                     collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
                     collidee_id = collision.get_collider_id()
                     collidee_material, collidee_amp = self._get_object_info(collidee_id, scene.object_ids, obj_name)
+                    # Set a custom material for the dropped object.
+                    if collidee_id == o_id:
+                        collidee_material = material
+                    elif collider_id == o_id:
+                        collider_material = material
                     impact_sound_command = self.py_impact.get_impact_sound_command(
                         collision=collision,
                         rigidbodies=rigidbodies,
@@ -158,6 +188,9 @@ class AudioDataset(Controller):
             for collision in environment_collisions:
                 collider_id = collision.get_object_id()
                 collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
+                # Set a custom material for the dropped object.
+                if collider_id == o_id:
+                    collider_material = material
                 surface_material = scene.get_surface_material()
                 impact_sound_command = self.py_impact.get_impact_sound_command(
                     collision=collision,
