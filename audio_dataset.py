@@ -43,14 +43,14 @@ class AudioDataset(Controller):
 
         # Global settings.
         self.communicate([{"$type": "set_screen_size",
-                           "width": 128,
-                           "height": 128},
-                          {"$type": "set_post_process",
-                           "value": False},
-                          {"$type": "set_render_quality",
-                           "render_quality": 1},
-                          {"$type": "set_shadows",
-                           "value": False}])
+                           "width": 256,
+                           "height": 256},
+                          {"$type": "set_time_step",
+                           "time_step": 0.02},
+                          {"$type": "set_target_framerate",
+                           "framerate": 60},
+                          {"$type": "set_physics_solver_iterations",
+                           "iterations": 36}])
 
     def init_scene(self) -> Tuple[Scene, Path]:
         """
@@ -122,7 +122,8 @@ class AudioDataset(Controller):
                      "enter": True,
                      "exit": False,
                      "stay": False,
-                     "collision_types": ["obj", "env"]}]
+                     "collision_types": ["obj", "env"]},
+                     {"$type": "pause_editor"}] # TODO remove this
         # Parse bounds data to get the centroid of all objects currently in the scene.
         bounds = Bounds(resp[0])
         if bounds.get_num() == 0:
@@ -149,7 +150,10 @@ class AudioDataset(Controller):
         commands.extend(TDWUtils.create_avatar(position={"x": a_x, "y": a_y, "z": a_z},
                                                look_at=look_at))
         # Add the audio sensor.
-        commands.append(scene.audio_system.add_audio_sensor())
+        # Disable the image sensor (this is audio-only).
+        commands.extend([scene.audio_system.add_audio_sensor(),
+                         {"$type": "toggle_image_sensor"}])
+
         # Send the commands.
         resp = self.communicate(commands)
 

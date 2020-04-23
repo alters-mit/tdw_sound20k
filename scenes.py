@@ -198,7 +198,7 @@ class FloorSound20k(_ProcGenRoom):
         return {"x": 0, "y": 0, "z": 0}
 
     def _get_audio_system(self) -> AudioSystem:
-        return StandardAudio()
+        return ResonanceAudio()
 
     def get_output_directory(self) -> str:
         return "floor_wood"
@@ -237,7 +237,7 @@ class CornerSound20k(_ProcGenRoom):
         return 120, 250
 
     def _get_audio_system(self) -> AudioSystem:
-        return StandardAudio()
+        return ResonanceAudio()
 
     def get_output_directory(self) -> str:
         return "corner_wood"

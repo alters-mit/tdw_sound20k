@@ -51,7 +51,7 @@ class ResonanceAudio(AudioSystem):
     Resonance Audio system.
     """
 
-    def __init__(self, env_id: int, floor: str = "parquet", ceiling: str = "acousticTile", walls: str = "smoothPlaster"):
+    def __init__(self, env_id: int = 0, floor: str = "parquet", ceiling: str = "acousticTile", walls: str = "smoothPlaster"):
         """
         :param env_id: Add a reverb space to this environment (room).
         :param floor: The floor reverb material.
