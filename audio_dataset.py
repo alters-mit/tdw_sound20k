@@ -6,7 +6,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple
 from platform import system
-from scenes import SOUND20K
+from scenes import SOUND20K, Scene
 
 RNG = np.random.RandomState(0)
 
@@ -40,12 +40,27 @@ class AudioDataset(Controller):
                           {"$type": "set_shadows",
                            "value": False}])
 
-    def trial(self) -> None:
+    def init_scene(self) -> Scene:
+        """
+        Initialize a new scene.
+
+        :return: The scene that was initialized.
+        """
+
         scene = SOUND20K[RNG.randint(0, len(SOUND20K))]()
-        init_commands = scene.get_commands(self)
-        init_commands.append({"$type": "send_bounds",
-                              "frequency": "once"})
-        resp = self.communicate(init_commands)
+        self.communicate(scene.initialize_scene(self))
+
+        return scene
+
+    def trial(self, scene: Scene) -> None:
+        """
+        Run a trial in a scene that has been initialized.
+
+        :param scene: Data for the current scene.
+        """
+
+        # Reset the scene, positioning objects, furniture, etc.
+        resp = self.communicate(scene.reset_scene(self))
         center = scene.get_center(self)
 
         obj_name = list(self.object_info.keys())[RNG.randint(0, len(self.object_info))]
@@ -106,7 +121,13 @@ class AudioDataset(Controller):
         a_z = np.sin(rad) * (a_x - center["x"]) + np.cos(rad) * (a_z - center["z"]) + center["z"]
         commands.extend(TDWUtils.create_avatar(position={"x": a_x, "y": a_y, "z": a_z},
                                                look_at=look_at))
+        # Add the audio sensor.
+        commands.append(scene.audio_system.add_audio_sensor())
+        # Send the commands.
         resp = self.communicate(commands)
+        # Loop until all objects are sleeping.
+        # TODO ffmpeg
+        # TODO metadata
         done = False
         while not done:
             commands = []
@@ -126,7 +147,8 @@ class AudioDataset(Controller):
                         target_mat=collidee_material.name,
                         other_id=collider_id,
                         other_mat=collider_material.name,
-                        other_amp=collider_amp)
+                        other_amp=collider_amp,
+                        play_audio_data=scene.audio_system.play_audio_data())
                     commands.append(impact_sound_command)
             # Handle environment collision.
             for collision in environment_collisions:
@@ -141,7 +163,8 @@ class AudioDataset(Controller):
                     target_mat=collider_material.name,
                     other_id=-1,
                     other_amp=0.5,
-                    other_mat=surface_material.name)
+                    other_mat=surface_material.name,
+                    play_audio_data=scene.audio_system.play_audio_data())
                 commands.append(impact_sound_command)
             # If there were no collisions, check for movement.
             if len(commands) == 0:
@@ -169,6 +192,3 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
-
-
-AudioDataset().trial()

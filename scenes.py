@@ -5,12 +5,13 @@ from tdw.py_impact import PyImpact, AudioMaterial
 import numpy as np
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
+from audio_system import *
 from pathlib import Path
 
 RNG = np.random.RandomState(0)
 
 
-class _Scene(ABC):
+class Scene(ABC):
     """
     A recipe to initialize a scene.
     """
@@ -28,15 +29,39 @@ class _Scene(ABC):
         for obj in custom_object_info:
             self.object_info.update({obj: custom_object_info[obj]})
 
-    @abstractmethod
-    def get_commands(self, c: Controller) -> List[dict]:
+        # Get the audio system.
+        self.audio_system = self._get_audio_system()
+
+    def initialize_scene(self, c: Controller) -> List[dict]:
         """
         :param c: The controller.
 
         :return: A list of commands to initialize a scene.
         """
 
-        raise Exception()
+        commands = []
+
+        # Initialize audio.
+        init_audio = self.audio_system.init_audio()
+        if init_audio is not None:
+            commands.append(init_audio)
+
+        return commands
+
+    def reset_scene(self, c: Controller) -> List[dict]:
+        """
+        :param c: The controller.
+
+        :return: A list of commands to reset a scene.
+        """
+
+        # Clean up all objects.
+        # Send bounds data (for the new objects).
+        commands = [{"$type": "destroy_all_objects"},
+                    {"$type": "send_bounds",
+                     "frequency": "once"}]
+
+        return commands
 
     @abstractmethod
     def get_center(self, c: Controller) -> Dict[str, float]:
@@ -99,31 +124,41 @@ class _Scene(ABC):
 
         raise Exception()
 
+    @abstractmethod
+    def _get_audio_system(self) -> AudioSystem:
+        """
+        :return: The audio system used in this scene.
+        """
 
-class _ProcGenRoom(_Scene):
+        raise Exception()
+
+
+class _ProcGenRoom(Scene):
     """
     Initialize the ProcGen room.
     """
 
-    def get_commands(self, c: Controller) -> List[dict]:
+    def initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super().initialize_scene(c)
         # Initialize the material library.
         if c.material_librarian is None:
             c.material_librarian = MaterialLibrarian()
         material: MaterialRecord = self._get_floor_material(c.material_librarian)
         # Load the scene and an empty room.
         # Add the material to the floor.
-        return [{"$type": "load_scene"},
-                TDWUtils.create_empty_room(12, 12),
-                {"$type": "add_material",
-                 "name": material.name,
-                 "url": material.get_url()},
-                {"$type": "set_proc_gen_floor_material",
-                 "name": material.name},
-                {"$type": "set_proc_gen_floor_texture_scale",
-                 "scale": {"x": 8, "y": 8}},
-                {"$type": "set_proc_gen_walls_scale",
-                 "walls": TDWUtils.get_box(12, 12),
-                 "scale": {"x": 1, "y": 4, "z": 1}}]
+        commands.extend([{"$type": "load_scene"},
+                         TDWUtils.create_empty_room(12, 12),
+                         {"$type": "add_material",
+                          "name": material.name,
+                          "url": material.get_url()},
+                         {"$type": "set_proc_gen_floor_material",
+                          "name": material.name},
+                         {"$type": "set_proc_gen_floor_texture_scale",
+                          "scale": {"x": 8, "y": 8}},
+                         {"$type": "set_proc_gen_walls_scale",
+                          "walls": TDWUtils.get_box(12, 12),
+                          "scale": {"x": 1, "y": 4, "z": 1}}])
+        return commands
 
     @abstractmethod
     def _get_floor_material(self, lib: MaterialLibrarian) -> MaterialRecord:
@@ -154,6 +189,9 @@ class FloorSound20k(_ProcGenRoom):
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 0, "y": 0, "z": 0}
 
+    def _get_audio_system(self) -> AudioSystem:
+        return StandardAudio()
+
 
 class CornerSound20k(_ProcGenRoom):
     """
@@ -161,8 +199,8 @@ class CornerSound20k(_ProcGenRoom):
     The "center" is offset to a corner.
     """
 
-    def get_commands(self, c: Controller) -> List[dict]:
-        commands = super().get_commands(c)
+    def initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super().initialize_scene(c)
         # Set the wall material too.
         mat_name = ""
         for cmd in commands:
@@ -186,6 +224,9 @@ class CornerSound20k(_ProcGenRoom):
     @staticmethod
     def get_camera_angles() -> Tuple[float, float]:
         return 120, 250
+
+    def _get_audio_system(self) -> AudioSystem:
+        return StandardAudio()
 
 
 class _FloorWithObject(FloorSound20k):
@@ -217,12 +258,14 @@ class _FloorWithObject(FloorSound20k):
 
         raise Exception()
 
-    def get_commands(self, c: Controller) -> List[dict]:
+    def reset_scene(self, c: Controller) -> List[dict]:
+        commands = super().reset_scene(c)
+        del self.object_ids[:]
         model_name = self._get_model_name()
         o_id = c.get_unique_id()
         self.object_ids.update({o_id: model_name})
-        commands = super().get_commands(c)
-        commands.extend([c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
+        commands.extend([{"$type": "destroy_all_objects"},
+                         c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
                          {"$type": "scale_object",
                           "id": o_id,
                           "scale_factor": self._get_model_scale()},
@@ -294,17 +337,17 @@ class StairRamp(_FloorWithObject):
         return {"x": 1, "y": 1, "z": 1}
 
     def _get_library(self) -> str:
-        return _Scene._MODEL_LIBRARY_PATH
+        return Scene._MODEL_LIBRARY_PATH
 
-    def get_commands(self, c: Controller) -> List[dict]:
-        commands = super().get_commands(c)
+    def reset_scene(self, c: Controller) -> List[dict]:
+        commands = super().reset_scene(c)
         commands.append({"$type": "teleport_object",
                          "id": list(self.object_ids.keys())[0],
                          "position": {"x": 0, "y": 0, "z": -0.25}})
         return commands
 
 
-class UnevenTerrain(_Scene):
+class UnevenTerrain(Scene):
     """
     Load an outdoor scene with uneven terrain.
     """
@@ -315,11 +358,16 @@ class UnevenTerrain(_Scene):
     def get_max_y(self) -> float:
         return 4
 
-    def get_commands(self, c: Controller) -> List[dict]:
-        return [c.get_add_scene(scene_name="building_site")]
+    def initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super().initialize_scene(c)
+        commands.extend([c.get_add_scene(scene_name="building_site")])
+        return commands
 
     def get_surface_material(self) -> AudioMaterial:
         return AudioMaterial.cardboard
+
+    def _get_audio_system(self) -> AudioSystem:
+        return StandardAudio()
 
 
 class DiningTableAndChairs(FloorSound20k):
@@ -327,10 +375,13 @@ class DiningTableAndChairs(FloorSound20k):
     A dining table with 8 chairs around it.
     """
 
-    def get_commands(self, c: Controller) -> List[dict]:
+    def initialize_scene(self, c: Controller) -> List[dict]:
         c.model_librarian = ModelLibrarian("models_full.json")
+        return super().initialize_scene(c)
+
+    def reset_scene(self, c: Controller) -> List[dict]:
         # Initialize the scene.
-        commands = super().get_commands(c)
+        commands = super().reset_scene(c)
         chair_name = "brown_leather_dining_chair"
         # Create the the table.
         commands.extend(self._init_object(c=c,
@@ -386,9 +437,13 @@ class DeskAndChair(FloorSound20k):
     def get_camera_angles() -> Tuple[float, float]:
         return 270, 300
 
-    def get_commands(self, c: Controller) -> List[dict]:
+    def initialize_scene(self, c: Controller) -> List[dict]:
         c.model_librarian = ModelLibrarian("models_full.json")
-        commands = super().get_commands(c)
+        return super().initialize_scene(c)
+
+    def reset_scene(self, c: Controller) -> List[dict]:
+        commands = super().reset_scene(c)
+
         # Add a table, chair, and boxes.
         commands.extend(self._init_object(c, "b05_table_new",
                                           pos={"x": 0, "y": 0, "z": 4.33},
