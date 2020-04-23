@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Dict, Tuple
 from platform import system
 from scenes import SOUND20K, Scene
+from subprocess import Popen, call
+from time import sleep
 
 RNG = np.random.RandomState(0)
 
@@ -125,8 +127,10 @@ class AudioDataset(Controller):
         commands.append(scene.audio_system.add_audio_sensor())
         # Send the commands.
         resp = self.communicate(commands)
+        # TODO output directory
+        recorder_pid = Popen(["fmedia", "--record", "--out=TEST.wav"]).pid
+        sleep(0.1)
         # Loop until all objects are sleeping.
-        # TODO ffmpeg
         # TODO metadata
         done = False
         while not done:
@@ -176,8 +180,8 @@ class AudioDataset(Controller):
             # Continue the trial.
             if not done:
                 self.communicate(commands)
-
-        self.communicate({"$type": "destroy_all_objects"})
+        # Stop video capture.
+        call(['taskkill', '/F', '/T', '/PID', str(recorder_pid)])
 
     def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
         """
