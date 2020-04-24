@@ -60,7 +60,7 @@ class ResonanceAudio(AudioSystem):
         """
 
         self.env_id = env_id
-        self.floor = floor,
+        self.floor = floor
         self.walls = walls
         self.ceiling = ceiling
 

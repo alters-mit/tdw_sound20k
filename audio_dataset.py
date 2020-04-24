@@ -13,25 +13,6 @@ from json import loads
 from weighted_collection import WeightedCollection
 from itertools import product
 
-ceramic = 0
-glass = 1
-metal = 2
-hardwood = 3
-wood = 4
-cardboard = 5
-
-sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
-sound20k_models = list(sound20k_models.keys())
-q = product(SOUND20K, [AudioMaterial.ceramic, AudioMaterial.glass, AudioMaterial.metal, AudioMaterial.hardwood, AudioMaterial.wood, AudioMaterial.cardboard], sound20k_models)
-count = 0
-for p in q:
-    print(p)
-    count += 1
-print(count)
-print(q)
-exit()
-
-
 RNG = np.random.RandomState(0)
 
 
@@ -248,3 +229,6 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
+
+
+AudioDataset().trial(SOUND20K[0](), "jug02", AudioMaterial.ceramic)

@@ -31,17 +31,23 @@ class Scene(ABC):
 
     def initialize_scene(self, c: Controller) -> List[dict]:
         """
+        Add these commands to the beginning of the list of initialization commands.
+
         :param c: The controller.
 
         :return: A list of commands to initialize a scene.
         """
 
         # Clean up all objects.
+        self.object_ids.clear()
+        commands = [{"$type": "destroy_all_objects"}]
+
+        # Custom commands to initialize the scene.
+        commands.extend(self._initialize_scene(c))
+
         # Send bounds data (for the new objects).
-        del self.object_ids[:]
-        commands = [{"$type": "destroy_all_objects"},
-                    {"$type": "send_bounds",
-                     "frequency": "once"}]
+        commands.append({"$type": "send_bounds",
+                         "frequency": "once"})
 
         # Initialize audio.
         init_audio = self.audio_system.init_audio()
@@ -49,6 +55,16 @@ class Scene(ABC):
             commands.append(init_audio)
 
         return commands
+
+    @abstractmethod
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        """
+        :param c: The controller.
+
+        :return: A list of commands to initialize a scene.
+        """
+
+        raise Exception()
 
     @abstractmethod
     def get_center(self, c: Controller) -> Dict[str, float]:
@@ -133,16 +149,13 @@ class _ProcGenRoom(Scene, ABC):
     Initialize the ProcGen room.
     """
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
-        commands = super().initialize_scene(c)
+    def _initialize_scene(self, c: Controller) -> List[dict]:
         # Load the scene and an empty room.
-        # Add the material to the floor.
-        commands.extend([{"$type": "load_scene"},
-                         TDWUtils.create_empty_room(12, 12),
-                         {"$type": "set_proc_gen_walls_scale",
-                          "walls": TDWUtils.get_box(12, 12),
-                          "scale": {"x": 1, "y": 4, "z": 1}}])
-        return commands
+        return [{"$type": "load_scene"},
+                TDWUtils.create_empty_room(12, 12),
+                {"$type": "set_proc_gen_walls_scale",
+                 "walls": TDWUtils.get_box(12, 12),
+                 "scale": {"x": 1, "y": 4, "z": 1}}]
 
     def get_max_y(self) -> float:
         return 3.5
@@ -207,13 +220,12 @@ class _FloorWithObject(FloorSound20k):
 
         raise Exception()
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
-        commands = super().initialize_scene(c)
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super()._initialize_scene(c)
         model_name = self._get_model_name()
         o_id = c.get_unique_id()
         self.object_ids.update({o_id: model_name})
-        commands.extend([{"$type": "destroy_all_objects"},
-                         c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
+        commands.extend([c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
                          {"$type": "set_mass",
                           "id": o_id,
                           "mass": 1000},
@@ -281,8 +293,8 @@ class StairRamp(_FloorWithObject):
     def _get_library(self) -> str:
         return Scene._MODEL_LIBRARY_PATH
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
-        commands = super().initialize_scene(c)
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super()._initialize_scene(c)
         commands.append({"$type": "teleport_object",
                          "id": list(self.object_ids.keys())[0],
                          "position": {"x": 0, "y": 0, "z": -0.25}})
@@ -303,8 +315,8 @@ class UnevenTerrain(_FloorWithObject):
     def _get_library(self) -> str:
         return Scene._MODEL_LIBRARY_PATH
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
-        commands = super().initialize_scene(c)
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super()._initialize_scene(c)
         # Let the object settle.
         commands.append({"$type": "step_physics",
                          "frames": 3})
@@ -319,10 +331,10 @@ class DiningTableAndChairs(FloorSound20k):
     A dining table with 8 chairs around it.
     """
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
+    def _initialize_scene(self, c: Controller) -> List[dict]:
         c.model_librarian = ModelLibrarian("models_full.json")
         # Initialize the scene.
-        commands = super().initialize_scene(c)
+        commands = super()._initialize_scene(c)
         chair_name = "brown_leather_dining_chair"
         # Create the the table.
         commands.extend(self._init_object(c=c,
@@ -381,9 +393,9 @@ class DeskAndChair(FloorSound20k):
     def get_camera_angles() -> Tuple[float, float]:
         return 270, 300
 
-    def initialize_scene(self, c: Controller) -> List[dict]:
+    def _initialize_scene(self, c: Controller) -> List[dict]:
         c.model_librarian = ModelLibrarian("models_full.json")
-        commands = super().initialize_scene(c)
+        commands = super()._initialize_scene(c)
 
         # Add a table, chair, and boxes.
         commands.extend(self._init_object(c, "b05_table_new",
