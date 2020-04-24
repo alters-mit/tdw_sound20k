@@ -11,6 +11,26 @@ from subprocess import Popen, call
 from time import sleep
 from json import loads
 from weighted_collection import WeightedCollection
+from itertools import product
+
+ceramic = 0
+glass = 1
+metal = 2
+hardwood = 3
+wood = 4
+cardboard = 5
+
+sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
+sound20k_models = list(sound20k_models.keys())
+q = product(SOUND20K, [AudioMaterial.ceramic, AudioMaterial.glass, AudioMaterial.metal, AudioMaterial.hardwood, AudioMaterial.wood, AudioMaterial.cardboard], sound20k_models)
+count = 0
+for p in q:
+    print(p)
+    count += 1
+print(count)
+print(q)
+exit()
+
 
 RNG = np.random.RandomState(0)
 
@@ -52,33 +72,18 @@ class AudioDataset(Controller):
                           {"$type": "set_physics_solver_iterations",
                            "iterations": 36}])
 
-    def init_scene(self) -> Tuple[Scene, Path]:
-        """
-        Initialize a new scene.
-
-        :return: The scene that was initialized, and the scene's output directory.
-        """
-
-        scene = SOUND20K[RNG.randint(0, len(SOUND20K))]()
-        self.communicate(scene.initialize_scene(self))
-
-        output_dir = self.output_dir.joinpath(scene.get_output_directory())
-        if not output_dir.exists():
-            output_dir.mkdir(parents=True)
-
-        return scene, output_dir
-
-    def trial(self, scene: Scene, output_dir: Path) -> None:
+    def trial(self, scene: Scene, obj_name: str, material: AudioMaterial) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
-        :param output_dir: The root output directory for the scene.
+        :param obj_name: The name of the object that will be dropped.
+        :param material: The material of the dropped object.
         """
 
-        # Get a random object and a random material.
-        obj_name = list(self.sound20k_models.keys())[RNG.randint(0, len(self.sound20k_models))]
-        material = self.sound20k_models[obj_name]["materials"].get()
+        output_dir = self.output_dir.joinpath(scene.get_output_directory())
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
 
         filename = output_dir.joinpath(obj_name + "_" + material.name + ".wav")
         output_path = output_dir.joinpath(filename)
@@ -86,8 +91,8 @@ class AudioDataset(Controller):
         if output_path.exists():
             return
 
-        # Reset the scene, positioning objects, furniture, etc.
-        resp = self.communicate(scene.reset_scene(self))
+        # Initialize the scene, positioning objects, furniture, etc.
+        resp = self.communicate(scene.initialize_scene(self))
         center = scene.get_center(self)
 
         obj_name = list(self.object_info.keys())[RNG.randint(0, len(self.object_info))]
@@ -123,7 +128,7 @@ class AudioDataset(Controller):
                      "exit": False,
                      "stay": False,
                      "collision_types": ["obj", "env"]},
-                     {"$type": "pause_editor"}] # TODO remove this
+                    {"$type": "pause_editor"}]  # TODO remove this; this is here to check if the pitched angle is ok.
         # Parse bounds data to get the centroid of all objects currently in the scene.
         bounds = Bounds(resp[0])
         if bounds.get_num() == 0:

@@ -274,6 +274,78 @@
             "wcategory": "birdhouse",
             "wnid": "n02843684"
         },
+        "int_kitchen_accessories_le_creuset_bowl_30cm": {
+            "asset_bundle_sizes": {
+                "Darwin": 503859,
+                "Linux": 665169,
+                "Windows": 367833
+            },
+            "bounds": {
+                "back": {
+                    "x": -1.490116e-08,
+                    "y": 0.06470462,
+                    "z": -0.1827193
+                },
+                "bottom": {
+                    "x": -1.490116e-08,
+                    "y": -1.490116e-08,
+                    "z": 0
+                },
+                "center": {
+                    "x": -1.490116e-08,
+                    "y": 0.06470462,
+                    "z": 0
+                },
+                "front": {
+                    "x": -1.490116e-08,
+                    "y": 0.06470463,
+                    "z": 0.1827193
+                },
+                "left": {
+                    "x": -0.1553261,
+                    "y": 0.06470462,
+                    "z": 0
+                },
+                "right": {
+                    "x": 0.1553261,
+                    "y": 0.06470462,
+                    "z": 0
+                },
+                "top": {
+                    "x": -1.490116e-08,
+                    "y": 0.1294093,
+                    "z": 0
+                }
+            },
+            "canonical_rotation": {
+                "x": 0,
+                "y": 0.0,
+                "z": 0
+            },
+            "composite_object": false,
+            "do_not_use": false,
+            "do_not_use_reason": "",
+            "flex": true,
+            "name": "int_kitchen_accessories_le_creuset_bowl_30cm",
+            "physics_quality": -1,
+            "scale_factor": 6,
+            "substructure": [
+                {
+                    "materials": [
+                        "Material_37",
+                        "SolidTiles_Opaque"
+                    ],
+                    "name": "int_kitchen_accessories_le_creuset_bowl_30cm"
+                }
+            ],
+            "urls": {
+                "Darwin": "https://s3.amazonaws.com/tdw_test_dev/models/osx_2018/int_kitchen_accessories_le_creuset_bowl_30cm",
+                "Linux": "https://s3.amazonaws.com/tdw_test_dev/models/linux_2018/int_kitchen_accessories_le_creuset_bowl_30cm",
+                "Windows": "https://s3.amazonaws.com/tdw_test_dev/models/windows_2018/int_kitchen_accessories_le_creuset_bowl_30cm"
+            },
+            "wcategory": "bowl (previously dish)",
+            "wnid": "n03206908"
+        },
         "model_normalized": {
             "asset_bundle_sizes": {
                 "Darwin": 69277,
@@ -886,6 +958,77 @@
             },
             "wcategory": "stairs",
             "wnid": "n04298171"
+        },
+        "uneven_terrain": {
+            "asset_bundle_sizes": {
+                "Darwin": 250789,
+                "Linux": 286205,
+                "Windows": 217610
+            },
+            "bounds": {
+                "back": {
+                    "x": -0.02679443,
+                    "y": 0.790268,
+                    "z": -16.04
+                },
+                "bottom": {
+                    "x": -0.02679443,
+                    "y": -0.2669141,
+                    "z": 0.01754761
+                },
+                "center": {
+                    "x": -0.02679443,
+                    "y": 0.790268,
+                    "z": 0.01754761
+                },
+                "front": {
+                    "x": -0.02679443,
+                    "y": 0.790268,
+                    "z": 16.07509
+                },
+                "left": {
+                    "x": -16.0936,
+                    "y": 0.790268,
+                    "z": 0.01754761
+                },
+                "right": {
+                    "x": 16.04001,
+                    "y": 0.790268,
+                    "z": 0.01754761
+                },
+                "top": {
+                    "x": -0.02679443,
+                    "y": 1.84745,
+                    "z": 0.01754761
+                }
+            },
+            "canonical_rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+            },
+            "composite_object": false,
+            "do_not_use": false,
+            "do_not_use_reason": "",
+            "flex": false,
+            "name": "uneven_terrain",
+            "physics_quality": -1,
+            "scale_factor": 0.31,
+            "substructure": [
+                {
+                    "materials": [
+                        "Material.002"
+                    ],
+                    "name": "default"
+                }
+            ],
+            "urls": {
+                "Darwin": "models/uneven_terrain/Darwin/uneven_terrain",
+                "Linux": "models/uneven_terrain/Linux/uneven_terrain",
+                "Windows": "models/uneven_terrain/Windows/uneven_terrain"
+            },
+            "wcategory": "",
+            "wnid": "n-0000001"
         }
     }
 }

@@ -1,0 +1,22 @@
+# TODO
+
+- [ ] Uneven terrain mesh
+  - [ ] Remove streamed scene
+- [ ] Collapse scene init and reset
+- [ ] Sound20K models
+  - [x] Select
+  - [ ] mass
+  - [ ] material
+  - [ ] amp
+  - [ ] bouncineess
+  - [ ] add to objects.csv
+- [ ] TDW models 
+  - [ ] Select
+  - [ ] mass
+  - [ ] material
+  - [ ] amp
+  - [ ] bouncineess
+  - [ ] add to objects.csv
+- [ ] Library relative paths
+- [x] Environment collision
+- [ ] Sound20K semantic translation
