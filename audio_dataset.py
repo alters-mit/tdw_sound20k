@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional
 from platform import system
 from scenes import SOUND20K, Scene
-from subprocess import Popen, call
-from time import sleep
+from subprocess import Popen, call, check_output
 from json import loads
 from weighted_collection import WeightedCollection
 from distutils import dir_util
 from os import devnull
 from itertools import product
+import re
 
 RNG = np.random.RandomState(0)
 
@@ -32,6 +32,11 @@ class AudioDataset(Controller):
         self.recorder_pid: Optional[int] = None
 
         self.object_info = PyImpact.get_object_info()
+
+        devices = check_output(["fmedia", "--list-dev"]).decode("utf-8").split("Capture:")[1]
+        dev_search = re.search("device #(.*): Stereo Mix", devices, flags=re.MULTILINE)
+        assert dev_search is not None, "No suitable audio capture device found:\n" + devices
+        self.capture_device = dev_search.group(1)
 
         # Load model material data.
         sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
@@ -70,7 +75,8 @@ class AudioDataset(Controller):
         """
 
         if self.recorder_pid is not None:
-            call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)])
+            with open(devnull, "w+") as f:
+                call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
 
     def trial(self, scene: Scene, obj_name: str, material: AudioMaterial) -> None:
         """
@@ -170,9 +176,12 @@ class AudioDataset(Controller):
 
         # Send the commands.
         resp = self.communicate(commands)
-
-        self.recorder_pid = Popen(["fmedia", "--record", f"--out={str(output_path.resolve())}"]).pid
-        sleep(0.1)
+        with open(devnull, "w+") as f:
+            self.recorder_pid = Popen(["fmedia",
+                                       "--record",
+                                       f"--dev-capture={self.capture_device}",
+                                       f"--out={str(output_path.resolve())}"],
+                                      stderr=f).pid
 
         # Loop until all objects are sleeping.
         done = False
