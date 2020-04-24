@@ -203,7 +203,7 @@ class AudioDataset(Controller):
                     target_amp=collider_amp,
                     target_mat=collider_material.name,
                     other_id=-1,
-                    other_amp=0.5,
+                    other_amp=0.1,
                     other_mat=surface_material.name,
                     play_audio_data=scene.audio_system.play_audio_data())
                 commands.append(impact_sound_command)

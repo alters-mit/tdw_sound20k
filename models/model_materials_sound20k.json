@@ -25,7 +25,7 @@
     "name": "b006_clyde-clock_vray"
   },
   "b03_boat_fishing_02_null_11": {
-    "library": "models_full.json",
+    "library": "models/models.json",
     "materials": {
       "hardwood": 20,
       "metal": 39,
