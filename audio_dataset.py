@@ -9,11 +9,11 @@ from platform import system
 from scenes import get_sound20k_scenes, Scene
 from subprocess import Popen, call, check_output
 from json import loads
-from weighted_collection import WeightedCollection
 from distutils import dir_util
 from os import devnull
 from tqdm import tqdm
 import re
+from itertools import product
 
 RNG = np.random.RandomState(0)
 
@@ -76,36 +76,27 @@ class AudioDataset(Controller):
         """
 
         # Load model material data.
-        sound20k_models_raw = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
-        sound20k_models = dict()
-        for key in sound20k_models_raw:
-            # Convert the materials dictionary to a WeightedCollection.
-            model_materials = WeightedCollection()
-            model_materials.add_many(sound20k_models_raw[key]["materials"])
-            sound20k_models.update({key: {"name": key,
-                                          "library": sound20k_models_raw[key]["library"],
-                                          "materials": model_materials}})
+        sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
 
-        sound20k_scenes = get_sound20k_scenes()
+        combos = list(product(get_sound20k_scenes(), list(sound20k_models.keys())))
 
         count = 0
-        obj_names = list(self.object_info.keys())
+        combo_index = 0
         pbar = tqdm(total=total)
         while count < total:
-            scene: Scene = sound20k_scenes.get()
-            obj_name = obj_names[RNG.randint(0, len(obj_names))]
-            material = sound20k_models[obj_name]["materials"].get()
-            self.trial(scene, obj_name, material)
+            self.trial(combos[combo_index][0], combos[combo_index][1])
             count += 1
+            combo_index += 1
+            if combo_index >= len(combos):
+                combo_index = 0
             pbar.update(1)
 
-    def trial(self, scene: Scene, obj_name: str, material: AudioMaterial) -> None:
+    def trial(self, scene: Scene, obj_name: str) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
         :param obj_name: The name of the object that will be dropped.
-        :param material: The material of the dropped object.
         """
 
         output_dir = self.output_dir.joinpath(scene.get_output_directory())
@@ -113,14 +104,12 @@ class AudioDataset(Controller):
             output_dir.mkdir(parents=True)
 
         file_count = 0
-        filename = output_dir.joinpath(obj_name + "_" + material.name + "_" + TDWUtils.zero_padding(file_count, 4) +
-                                       ".wav")
+        filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
         output_path = output_dir.joinpath(filename)
         # Skip files that already exist.
         while output_path.exists():
             file_count += 1
-            filename = output_dir.joinpath(obj_name + "_" + material.name + "_" + TDWUtils.zero_padding(file_count, 4) +
-                                           ".wav")
+            filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
             output_path = output_dir.joinpath(filename)
 
         # Initialize the scene, positioning objects, furniture, etc.
@@ -218,14 +207,9 @@ class AudioDataset(Controller):
                 if PyImpact.is_valid_collision(collision):
                     # Get the audio material and amp.
                     collider_id = collision.get_collider_id()
-                    collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
+                    collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, obj_name)
                     collidee_id = collision.get_collider_id()
-                    collidee_material, collidee_amp = self._get_object_info(collidee_id, scene.object_ids, obj_name)
-                    # Set a custom material for the dropped object.
-                    if collidee_id == o_id:
-                        collidee_material = material
-                    elif collider_id == o_id:
-                        collider_material = material
+                    collidee_material, collidee_amp = self._get_object_info(collidee_id, Scene.OBJECT_IDS, obj_name)
                     impact_sound_command = self.py_impact.get_impact_sound_command(
                         collision=collision,
                         rigidbodies=rigidbodies,
@@ -240,10 +224,7 @@ class AudioDataset(Controller):
             # Handle environment collision.
             for collision in environment_collisions:
                 collider_id = collision.get_object_id()
-                collider_material, collider_amp = self._get_object_info(collider_id, scene.object_ids, obj_name)
-                # Set a custom material for the dropped object.
-                if collider_id == o_id:
-                    collider_material = material
+                collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, obj_name)
                 surface_material = scene.get_surface_material()
                 impact_sound_command = self.py_impact.get_impact_sound_command(
                     collision=collision,
@@ -282,12 +263,3 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
-
-
-if __name__ == "__main__":
-    a = AudioDataset()
-    a.remove_output_directory()
-    try:
-        a.trial(SOUND20K[0](), "jug02", AudioMaterial.ceramic)
-    finally:
-        a.stop_recording()

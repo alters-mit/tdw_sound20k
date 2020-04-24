@@ -2,11 +2,10 @@ from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.librarian import ModelLibrarian
 from tdw.py_impact import PyImpact, AudioMaterial
-from audio_system import StandardAudio, ResonanceAudio, AudioSystem
+from audio_system import ResonanceAudio, AudioSystem
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
-from weighted_collection import WeightedCollection
 
 
 class Scene(ABC):
@@ -17,7 +16,7 @@ class Scene(ABC):
     _MODEL_LIBRARY_PATH = str(Path("models/models.json").resolve())
 
     # A list of object IDs for the scene objects and the model names.
-    _OBJECT_IDS: Dict[int, str] = {}
+    OBJECT_IDS: Dict[int, str] = {}
     _OBJECT_INFO = PyImpact.get_object_info()
     # Append custom data.
     _custom_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
@@ -38,7 +37,7 @@ class Scene(ABC):
         """
 
         # Clean up all objects.
-        Scene._OBJECT_IDS.clear()
+        Scene.OBJECT_IDS.clear()
         commands = [{"$type": "destroy_all_objects"}]
 
         # Custom commands to initialize the scene.
@@ -95,7 +94,7 @@ class Scene(ABC):
         """
 
         o_id = c.get_unique_id()
-        Scene._OBJECT_IDS.update({o_id: name})
+        Scene.OBJECT_IDS.update({o_id: name})
         info = Scene._OBJECT_INFO[name]
         return [c.get_add_object(name,
                                  object_id=o_id,
@@ -224,7 +223,7 @@ class _FloorWithObject(FloorSound20k):
         commands = super()._initialize_scene(c)
         model_name = self._get_model_name()
         o_id = c.get_unique_id()
-        Scene._OBJECT_IDS.update({o_id: model_name})
+        Scene.OBJECT_IDS.update({o_id: model_name})
         commands.extend([c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
                          {"$type": "set_mass",
                           "id": o_id,
@@ -296,7 +295,7 @@ class StairRamp(_FloorWithObject):
     def _initialize_scene(self, c: Controller) -> List[dict]:
         commands = super()._initialize_scene(c)
         commands.append({"$type": "teleport_object",
-                         "id": list(Scene._OBJECT_IDS.keys())[0],
+                         "id": list(Scene.OBJECT_IDS.keys())[0],
                          "position": {"x": 0, "y": 0, "z": -0.25}})
         return commands
 
@@ -413,7 +412,7 @@ class DeskAndChair(FloorSound20k):
         # Add a shelf with a custom scale.
         shelf_id = c.get_unique_id()
         shelf_name = "metal_lab_shelf"
-        Scene._OBJECT_IDS.update({shelf_id: shelf_name})
+        Scene.OBJECT_IDS.update({shelf_id: shelf_name})
         commands.extend([c.get_add_object(shelf_name,
                          object_id=shelf_id,
                          rotation={"x": 0, "y": -90, "z": 0},
@@ -435,19 +434,11 @@ class DeskAndChair(FloorSound20k):
         return super().get_output_directory() + "_desk-shelf-chair"
 
 
-def get_sound20k_scenes() -> WeightedCollection:
+def get_sound20k_scenes() -> List[Scene]:
     """
-    :return: A WeightedCollection of scenes, based on their frequency in the original Sound20K dataset.
+    :return: A list of scenes, based on their frequency in the original Sound20K dataset.
     """
 
-    w = WeightedCollection(Scene)
-    w.add_many({FloorSound20k(): 25,
-                CornerSound20k(): 14,
-                StairRamp(): 13,
-                RoundTable(): 14,
-                UnevenTerrain(): 20,
-                LargeBowl(): 4,
-                Ramp(): 5,
-                DeskAndChair(): 2,
-                DiningTableAndChairs(): 2})
-    return w
+    return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
+            DeskAndChair(), DiningTableAndChairs()]
+
