@@ -4,13 +4,15 @@ from tdw.py_impact import PyImpact, AudioMaterial
 from tdw.output_data import Bounds
 import numpy as np
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from platform import system
 from scenes import SOUND20K, Scene
 from subprocess import Popen, call
 from time import sleep
 from json import loads
 from weighted_collection import WeightedCollection
+from distutils import dir_util
+from os import devnull
 from itertools import product
 
 RNG = np.random.RandomState(0)
@@ -26,6 +28,8 @@ class AudioDataset(Controller):
 
         self.total_num = total_num
         self.py_impact = PyImpact()
+
+        self.recorder_pid: Optional[int] = None
 
         self.object_info = PyImpact.get_object_info()
 
@@ -51,7 +55,22 @@ class AudioDataset(Controller):
                           {"$type": "set_target_framerate",
                            "framerate": 60},
                           {"$type": "set_physics_solver_iterations",
-                           "iterations": 36}])
+                           "iterations": 20}])
+
+    def remove_output_directory(self) -> None:
+        """
+        Delete the old directory.
+        """
+
+        dir_util.remove_tree(str(self.output_dir.resolve()))
+
+    def stop_recording(self) -> None:
+        """
+        Kill the recording process.
+        """
+
+        if self.recorder_pid is not None:
+            call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)])
 
     def trial(self, scene: Scene, obj_name: str, material: AudioMaterial) -> None:
         """
@@ -118,8 +137,7 @@ class AudioDataset(Controller):
                      "enter": True,
                      "exit": False,
                      "stay": False,
-                     "collision_types": ["obj", "env"]},
-                    {"$type": "pause_editor"}]  # TODO remove this; this is here to check if the pitched angle is ok.
+                     "collision_types": ["obj", "env"]}]
         # Parse bounds data to get the centroid of all objects currently in the scene.
         bounds = Bounds(resp[0])
         if bounds.get_num() == 0:
@@ -153,7 +171,7 @@ class AudioDataset(Controller):
         # Send the commands.
         resp = self.communicate(commands)
 
-        recorder_pid = Popen(["fmedia", "--record", f"--out={str(output_path.resolve())}"]).pid
+        self.recorder_pid = Popen(["fmedia", "--record", f"--out={str(output_path.resolve())}"]).pid
         sleep(0.1)
 
         # Loop until all objects are sleeping.
@@ -212,9 +230,9 @@ class AudioDataset(Controller):
                         break
             # Continue the trial.
             if not done:
-                self.communicate(commands)
+                resp = self.communicate(commands)
         # Stop video capture.
-        call(['taskkill', '/F', '/T', '/PID', str(recorder_pid)])
+        self.stop_recording()
 
     def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
         """
@@ -231,4 +249,10 @@ class AudioDataset(Controller):
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
 
 
-AudioDataset().trial(SOUND20K[0](), "jug02", AudioMaterial.ceramic)
+if __name__ == "__main__":
+    a = AudioDataset()
+    a.remove_output_directory()
+    try:
+        a.trial(SOUND20K[0](), "jug02", AudioMaterial.ceramic)
+    finally:
+        a.stop_recording()
