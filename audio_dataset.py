@@ -6,13 +6,13 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 from platform import system
-from scenes import SOUND20K, Scene
+from scenes import get_sound20k_scenes, Scene
 from subprocess import Popen, call, check_output
 from json import loads
 from weighted_collection import WeightedCollection
 from distutils import dir_util
 from os import devnull
-from itertools import product
+from tqdm import tqdm
 import re
 
 RNG = np.random.RandomState(0)
@@ -38,17 +38,6 @@ class AudioDataset(Controller):
         dev_search = re.search("device #(.*): Stereo Mix", devices, flags=re.MULTILINE)
         assert dev_search is not None, "No suitable audio capture device found:\n" + devices
         self.capture_device = dev_search.group(1)
-
-        # Load model material data.
-        sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
-        self.sound20k_models = dict()
-        for key in sound20k_models:
-            # Convert the materials dictionary to a WeightedCollection.
-            model_materials = WeightedCollection()
-            model_materials.add_many(sound20k_models[key]["materials"])
-            self.sound20k_models.update({key: {"name": key,
-                                               "library": sound20k_models[key]["library"],
-                                               "materials": model_materials}})
 
         super().__init__(port=port)
 
@@ -79,6 +68,37 @@ class AudioDataset(Controller):
             with open(devnull, "w+") as f:
                 call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
 
+    def sound20k(self, total: int = 20378) -> None:
+        """
+        Generate a dataset analogous to Sound20K.
+
+        :param total: The total number of audio files to create.
+        """
+
+        # Load model material data.
+        sound20k_models_raw = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
+        sound20k_models = dict()
+        for key in sound20k_models_raw:
+            # Convert the materials dictionary to a WeightedCollection.
+            model_materials = WeightedCollection()
+            model_materials.add_many(sound20k_models_raw[key]["materials"])
+            sound20k_models.update({key: {"name": key,
+                                          "library": sound20k_models_raw[key]["library"],
+                                          "materials": model_materials}})
+
+        sound20k_scenes = get_sound20k_scenes()
+
+        count = 0
+        obj_names = list(self.object_info.keys())
+        pbar = tqdm(total=total)
+        while count < total:
+            scene: Scene = sound20k_scenes.get()
+            obj_name = obj_names[RNG.randint(0, len(obj_names))]
+            material = sound20k_models[obj_name]["materials"].get()
+            self.trial(scene, obj_name, material)
+            count += 1
+            pbar.update(1)
+
     def trial(self, scene: Scene, obj_name: str, material: AudioMaterial) -> None:
         """
         Run a trial in a scene that has been initialized.
@@ -92,11 +112,16 @@ class AudioDataset(Controller):
         if not output_dir.exists():
             output_dir.mkdir(parents=True)
 
-        filename = output_dir.joinpath(obj_name + "_" + material.name + ".wav")
+        file_count = 0
+        filename = output_dir.joinpath(obj_name + "_" + material.name + "_" + TDWUtils.zero_padding(file_count, 4) +
+                                       ".wav")
         output_path = output_dir.joinpath(filename)
         # Skip files that already exist.
-        if output_path.exists():
-            return
+        while output_path.exists():
+            file_count += 1
+            filename = output_dir.joinpath(obj_name + "_" + material.name + "_" + TDWUtils.zero_padding(file_count, 4) +
+                                           ".wav")
+            output_path = output_dir.joinpath(filename)
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))

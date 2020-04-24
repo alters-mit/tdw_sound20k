@@ -6,6 +6,7 @@ from audio_system import StandardAudio, ResonanceAudio, AudioSystem
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
+from weighted_collection import WeightedCollection
 
 
 class Scene(ABC):
@@ -15,17 +16,15 @@ class Scene(ABC):
 
     _MODEL_LIBRARY_PATH = str(Path("models/models.json").resolve())
 
+    # A list of object IDs for the scene objects and the model names.
+    _OBJECT_IDS: Dict[int, str] = {}
+    _OBJECT_INFO = PyImpact.get_object_info()
+    # Append custom data.
+    _custom_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
+    for obj in _custom_object_info:
+        _OBJECT_INFO.update({obj: _custom_object_info[obj]})
+
     def __init__(self):
-        # A list of object IDs for the scene objects and the model names.
-        self.object_ids: Dict[int, str] = {}
-
-        self.object_info = PyImpact.get_object_info()
-
-        # Append custom data.
-        custom_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
-        for obj in custom_object_info:
-            self.object_info.update({obj: custom_object_info[obj]})
-
         # Get the audio system.
         self.audio_system = self._get_audio_system()
 
@@ -39,7 +38,7 @@ class Scene(ABC):
         """
 
         # Clean up all objects.
-        self.object_ids.clear()
+        Scene._OBJECT_IDS.clear()
         commands = [{"$type": "destroy_all_objects"}]
 
         # Custom commands to initialize the scene.
@@ -84,7 +83,8 @@ class Scene(ABC):
 
         raise Exception()
 
-    def _init_object(self, c: Controller, name: str, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
+    @staticmethod
+    def _init_object(c: Controller, name: str, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
         """
         :param c: The controller.
         :param name: The name of the model.
@@ -95,8 +95,8 @@ class Scene(ABC):
         """
 
         o_id = c.get_unique_id()
-        self.object_ids.update({o_id: name})
-        info = self.object_info[name]
+        Scene._OBJECT_IDS.update({o_id: name})
+        info = Scene._OBJECT_INFO[name]
         return [c.get_add_object(name,
                                  object_id=o_id,
                                  position=pos,
@@ -224,14 +224,14 @@ class _FloorWithObject(FloorSound20k):
         commands = super()._initialize_scene(c)
         model_name = self._get_model_name()
         o_id = c.get_unique_id()
-        self.object_ids.update({o_id: model_name})
+        Scene._OBJECT_IDS.update({o_id: model_name})
         commands.extend([c.get_add_object(model_name, object_id=o_id, library=self._get_library()),
                          {"$type": "set_mass",
                           "id": o_id,
                           "mass": 1000},
                          {"$type": "set_physic_material",
                           "id": o_id,
-                          "bounciness": self.object_info[model_name].bounciness,
+                          "bounciness": Scene._OBJECT_INFO[model_name].bounciness,
                           "static_friction": 0.1,
                           "dynamic_friction": 0.8}])
         return commands
@@ -296,7 +296,7 @@ class StairRamp(_FloorWithObject):
     def _initialize_scene(self, c: Controller) -> List[dict]:
         commands = super()._initialize_scene(c)
         commands.append({"$type": "teleport_object",
-                         "id": list(self.object_ids.keys())[0],
+                         "id": list(Scene._OBJECT_IDS.keys())[0],
                          "position": {"x": 0, "y": 0, "z": -0.25}})
         return commands
 
@@ -413,7 +413,7 @@ class DeskAndChair(FloorSound20k):
         # Add a shelf with a custom scale.
         shelf_id = c.get_unique_id()
         shelf_name = "metal_lab_shelf"
-        self.object_ids.update({shelf_id: shelf_name})
+        Scene._OBJECT_IDS.update({shelf_id: shelf_name})
         commands.extend([c.get_add_object(shelf_name,
                          object_id=shelf_id,
                          rotation={"x": 0, "y": -90, "z": 0},
@@ -423,7 +423,7 @@ class DeskAndChair(FloorSound20k):
                           "mass": 400},
                          {"$type": "set_physic_material",
                           "id": shelf_id,
-                          "bounciness": self.object_info[shelf_name].bounciness,
+                          "bounciness": Scene._OBJECT_INFO[shelf_name].bounciness,
                           "static_friction": 0.1,
                           "dynamic_friction": 0.8},
                          {"$type": "scale_object",
@@ -435,4 +435,19 @@ class DeskAndChair(FloorSound20k):
         return super().get_output_directory() + "_desk-shelf-chair"
 
 
-SOUND20K = [FloorSound20k, CornerSound20k, LargeBowl, Ramp, StairRamp, UnevenTerrain, DiningTableAndChairs, DeskAndChair]
+def get_sound20k_scenes() -> WeightedCollection:
+    """
+    :return: A WeightedCollection of scenes, based on their frequency in the original Sound20K dataset.
+    """
+
+    w = WeightedCollection(Scene)
+    w.add_many({FloorSound20k(): 25,
+                CornerSound20k(): 14,
+                StairRamp(): 13,
+                RoundTable(): 14,
+                UnevenTerrain(): 20,
+                LargeBowl(): 4,
+                Ramp(): 5,
+                DeskAndChair(): 2,
+                DiningTableAndChairs(): 2})
+    return w
