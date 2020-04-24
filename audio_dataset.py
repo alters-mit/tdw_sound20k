@@ -33,6 +33,7 @@ class AudioDataset(Controller):
 
         self.object_info = PyImpact.get_object_info()
 
+        # Get the correct device to record system audio.
         devices = check_output(["fmedia", "--list-dev"]).decode("utf-8").split("Capture:")[1]
         dev_search = re.search("device #(.*): Stereo Mix", devices, flags=re.MULTILINE)
         assert dev_search is not None, "No suitable audio capture device found:\n" + devices
