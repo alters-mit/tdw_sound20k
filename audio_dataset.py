@@ -232,7 +232,7 @@ class AudioDataset(Controller):
         # Add the avatar.
         r = RNG.uniform(2.3, 4.6)
         a_x = center["x"] + r
-        a_y = RNG.uniform(1.8, 2.2)
+        a_y = RNG.uniform(1.5, 3)
         a_z = center["y"] + r
         cam_angle_min, cam_angle_max = scene.get_camera_angles()
         theta = RNG.uniform(cam_angle_min, cam_angle_max)
