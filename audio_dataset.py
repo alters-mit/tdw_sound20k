@@ -17,11 +17,15 @@ import re
 
 RNG = np.random.RandomState(0)
 
-# TODO organize by wnid.
-
 
 class AudioDataset(Controller):
     def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
+        """
+        :param total_num: The total number of files to generate.
+        :param output_dir: The output directory for the files.
+        :param port: The socket port.
+        """
+        
         assert system() == "Windows", "This controller only works in Windows."
 
         self.output_dir = output_dir
