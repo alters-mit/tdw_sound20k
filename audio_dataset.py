@@ -19,20 +19,18 @@ RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
+    def __init__(self, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
         """
-        :param total_num: The total number of files to generate.
         :param output_dir: The output directory for the files.
         :param port: The socket port.
         """
-        
+
         assert system() == "Windows", "This controller only works in Windows."
 
         self.output_dir = output_dir
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
 
-        self.total_num = total_num
         self.py_impact = PyImpact()
 
         self.recorder_pid: Optional[int] = None
@@ -81,7 +79,7 @@ class AudioDataset(Controller):
             with open(devnull, "w+") as f:
                 call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
 
-    def sound20k(self, total: int = 20378) -> None:
+    def sound20k(self, total: int = 28602) -> None:
         """
         Generate a dataset analogous to Sound20K.
 
