@@ -99,6 +99,8 @@ class AudioDataset(Controller):
         :param obj_name: The name of the object that will be dropped.
         """
 
+        self.py_impact.reset()
+
         output_dir = self.output_dir.joinpath(scene.get_output_directory())
         if not output_dir.exists():
             output_dir.mkdir(parents=True)

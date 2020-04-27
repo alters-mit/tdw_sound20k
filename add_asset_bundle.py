@@ -19,7 +19,7 @@ for model in models:
     src_dir = src_root_dir.joinpath(m["path"])
     assert src_dir.exists()
     # Create the asset bundles.
-    asset_bundle_srcs, record_src = a.create_asset_bundle(src_dir, True, add_textures=False)
+    asset_bundle_srcs, record_src = a.create_asset_bundle(src_dir, True)
     record = ModelRecord(loads(record_src.read_text(encoding="utf-8")))
     record.name = m["name"]
     # Move and rename the asset bundles.
