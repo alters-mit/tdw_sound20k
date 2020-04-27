@@ -36,6 +36,12 @@ class AudioDataset(Controller):
         self.recorder_pid: Optional[int] = None
 
         self.object_info = PyImpact.get_object_info()
+        sound20k_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
+        for obj_info in sound20k_object_info:
+            if obj_info in self.object_info:
+                self.object_info[obj_info] = sound20k_object_info[obj_info]
+            else:
+                self.object_info.update({obj_info: sound20k_object_info[obj_info]})
 
         lib_full = ModelLibrarian("models_full.json")
         lib_sound20k = ModelLibrarian(str(Path("models/models.json").resolve()))
