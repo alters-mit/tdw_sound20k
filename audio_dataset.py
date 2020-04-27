@@ -207,7 +207,7 @@ class AudioDataset(Controller):
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 2),
+                     "magnitude": RNG.uniform(0, 4),
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
