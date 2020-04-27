@@ -1,8 +1,8 @@
 # TODO
 
-- [ ] Uneven terrain mesh
-  - [ ] Remove streamed scene
-- [ ] Collapse scene init and reset
+- [x] Uneven terrain mesh
+  - [x] Remove streamed scene
+- [x] Collapse scene init and reset
 - [ ] Sound20K models
   - [x] Select
   - [ ] mass

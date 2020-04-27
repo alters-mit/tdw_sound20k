@@ -135,9 +135,9 @@ class Scene(ABC):
         raise Exception()
 
     @abstractmethod
-    def get_output_directory(self) -> str:
+    def get_name(self) -> str:
         """
-        :return: The name of the output directory.
+        :return: The name of the scene.
         """
 
         raise Exception()
@@ -174,7 +174,7 @@ class FloorSound20k(_ProcGenRoom):
     def _get_audio_system(self) -> AudioSystem:
         return ResonanceAudio()
 
-    def get_output_directory(self) -> str:
+    def get_name(self) -> str:
         return "floor_wood"
 
 
@@ -194,7 +194,7 @@ class CornerSound20k(_ProcGenRoom):
     def _get_audio_system(self) -> AudioSystem:
         return ResonanceAudio()
 
-    def get_output_directory(self) -> str:
+    def get_name(self) -> str:
         return "corner_wood"
 
 
@@ -247,8 +247,8 @@ class LargeBowl(_FloorWithObject):
     def _get_library(self) -> str:
         return Scene._MODEL_LIBRARY_PATH
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_bowl"
+    def get_name(self) -> str:
+        return super().get_name() + "_bowl"
 
 
 class Ramp(_FloorWithObject):
@@ -262,8 +262,8 @@ class Ramp(_FloorWithObject):
     def _get_library(self) -> str:
         return "models_special.json"
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_ramp"
+    def get_name(self) -> str:
+        return super().get_name() + "_ramp"
 
 
 class RoundTable(_FloorWithObject):
@@ -277,8 +277,8 @@ class RoundTable(_FloorWithObject):
     def _get_library(self) -> str:
         return "models_full.json"
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_round-table"
+    def get_name(self) -> str:
+        return super().get_name() + "_round_table"
 
 
 class StairRamp(_FloorWithObject):
@@ -299,8 +299,8 @@ class StairRamp(_FloorWithObject):
                          "position": {"x": 0, "y": 0, "z": -0.25}})
         return commands
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_stair-ramp"
+    def get_name(self) -> str:
+        return super().get_name() + "_stair_ramp"
 
 
 class UnevenTerrain(_FloorWithObject):
@@ -321,8 +321,8 @@ class UnevenTerrain(_FloorWithObject):
                          "frames": 3})
         return commands
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_uneven-terrain"
+    def get_name(self) -> str:
+        return super().get_name() + "_uneven_terrain"
 
 
 class DiningTableAndChairs(FloorSound20k):
@@ -376,8 +376,8 @@ class DiningTableAndChairs(FloorSound20k):
 
         return commands
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_table-chairs"
+    def get_name(self) -> str:
+        return super().get_name() + "_table_chairs"
 
 
 class DeskAndChair(FloorSound20k):
@@ -430,8 +430,8 @@ class DeskAndChair(FloorSound20k):
                           "scale_factor": {"x": 1, "y": 1.5, "z": 1.8}}])
         return commands
 
-    def get_output_directory(self) -> str:
-        return super().get_output_directory() + "_desk-shelf-chair"
+    def get_name(self) -> str:
+        return super().get_name() + "_desk_shelf_chair"
 
 
 def get_sound20k_scenes() -> List[Scene]:

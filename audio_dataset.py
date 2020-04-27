@@ -2,9 +2,10 @@ from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.py_impact import PyImpact, AudioMaterial
 from tdw.output_data import Bounds
+from tdw.librarian import ModelLibrarian
 import numpy as np
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 from platform import system
 from scenes import get_sound20k_scenes, Scene
 from subprocess import Popen, call, check_output
@@ -13,7 +14,6 @@ from distutils import dir_util
 from os import devnull
 from tqdm import tqdm
 import re
-from itertools import product
 
 RNG = np.random.RandomState(0)
 
@@ -34,6 +34,13 @@ class AudioDataset(Controller):
         self.recorder_pid: Optional[int] = None
 
         self.object_info = PyImpact.get_object_info()
+
+        lib_full = ModelLibrarian("models_full.json")
+        lib_sound20k = ModelLibrarian(str(Path("models/models.json").resolve()))
+        lib_special = ModelLibrarian("models_special.json")
+        self.libs = {"models_full.json": lib_full,
+                     "models_special.json": lib_special,
+                     "models/models.json": lib_sound20k}
 
         # Get the correct device to record system audio.
         devices = check_output(["fmedia", "--list-dev"]).decode("utf-8").split("Capture:")[1]
@@ -77,59 +84,105 @@ class AudioDataset(Controller):
         :param total: The total number of audio files to create.
         """
 
-        # Load model material data.
-        sound20k_models = loads(Path("models/model_materials_sound20k.json").read_text(encoding="utf-8"))
+        # Load models by wnid.
+        wnids = loads(Path("models/wnids_sound20k.json").read_text(encoding="utf-8"))
+        num_per_wnid = int(total / len(wnids))
 
-        combos = list(product(get_sound20k_scenes(), list(sound20k_models.keys())))
-
-        count = 0
-        combo_index = 0
+        scenes = get_sound20k_scenes()
         pbar = tqdm(total=total)
-        while count < total:
-            self.trial(combos[combo_index][0], combos[combo_index][1])
-            count += 1
-            combo_index += 1
-            if combo_index >= len(combos):
-                combo_index = 0
-            pbar.update(1)
 
-    def trial(self, scene: Scene, obj_name: str) -> None:
+        for wnid in wnids:
+            pbar.set_description(wnid)
+            self.process_wnid(scenes, wnids[wnid], num_per_wnid, pbar)
+        pbar.close()
+
+    def process_wnid(self, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
+        """
+        Generate .wav files from all models in the category.
+
+        :param scenes: The scenes that a trial can use.
+        :param models: The names of the models in the category and their libraries.
+        :param num_total: The total number of files to generate for this category.
+        :param pbar: The progress bar.
+        """
+
+        num_images_per_model = int(num_total / len(models))
+        num_scenes_per_model = int(num_images_per_model / len(scenes))
+
+        # The number of files generated for the wnid.
+        count = 0
+        # The number of files generated for the current model.
+        model_count = 0
+        # The model being used to generate files.
+        model_index = 0
+        # The number of files for the current model that have used the current scene.
+        scene_count = 0
+        # The scene being used to generate files.
+        scene_index = 0
+
+        while count < num_total:
+            self.trial(scene=scenes[scene_index], obj_name=models[model_index]["name"],
+                       obj_library=models[model_index]["library"], file_count=model_count)
+            count += 1
+            # Iterate through scenes.
+            scene_count += 1
+            if scene_count > num_scenes_per_model:
+                scene_index += 1
+                if scene_index > len(scenes):
+                    scene_index = 0
+            # Iterate through models.
+            model_count += 1
+            if model_count > num_images_per_model:
+                model_index += 1
+                # If this is a new model, reset the scene count.
+                scene_index = 0
+                scene_count = 0
+                if model_index > len(models):
+                    model_index = 0
+            if pbar is not None:
+                pbar.update(1)
+
+    def trial(self, scene: Scene, obj_name: str, obj_library: str, file_count: int) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
         :param obj_name: The name of the object that will be dropped.
+        :param obj_library: The object's library.
+        :param file_count: The number of files with this object so far.
         """
 
         self.py_impact.reset()
+        obj_info = self.object_info[obj_name]
+        record = self.libs[obj_library].get_record(obj_name)
 
-        output_dir = self.output_dir.joinpath(scene.get_output_directory())
+        output_dir = self.output_dir.joinpath(record.wnid)
         if not output_dir.exists():
             output_dir.mkdir(parents=True)
 
-        file_count = 0
         filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
         output_path = output_dir.joinpath(filename)
         # Skip files that already exist.
         while output_path.exists():
-            file_count += 1
-            filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
-            output_path = output_dir.joinpath(filename)
+            return
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
         center = scene.get_center(self)
 
-        obj_name = list(self.object_info.keys())[RNG.randint(0, len(self.object_info))]
-        obj_info = self.object_info[obj_name]
         max_y = scene.get_max_y()
         o_x = RNG.uniform(center["x"] - 0.05, center["x"] + 0.05)
         o_y = RNG.uniform(max_y - 0.5, max_y)
         o_z = RNG.uniform(center["z"] - 0.05, center["z"] + 0.05)
         o_id = 0
         # Create the object and apply a force.
-        commands = [self.get_add_object(obj_name, object_id=o_id, library=obj_info.library,
-                                        position={"x": o_x, "y": o_y, "z": o_z}),
+        commands = [{"$type": "add_object",
+                     "name": record.name,
+                     "url": record.get_url(),
+                     "scale_factor": record.scale_factor,
+                     "position": {"x": o_x, "y": o_y, "z": o_z},
+                     "category": record.wcategory,
+                     "id": o_id},
                     {"$type": "set_mass",
                      "id": o_id,
                      "mass": obj_info.mass},
