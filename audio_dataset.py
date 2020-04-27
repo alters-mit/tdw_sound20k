@@ -17,6 +17,8 @@ from itertools import product
 
 RNG = np.random.RandomState(0)
 
+# TODO organize by wnid.
+
 
 class AudioDataset(Controller):
     def __init__(self, total_num: int = 20378, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
