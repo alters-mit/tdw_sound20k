@@ -3,13 +3,13 @@
 - [x] Uneven terrain mesh
   - [x] Remove streamed scene
 - [x] Collapse scene init and reset
-- [ ] Sound20K models
+- [x] Sound20K models
   - [x] Select
-  - [ ] mass
-  - [ ] material
-  - [ ] amp
-  - [ ] bouncineess
-  - [ ] add to objects.csv
+  - [x] mass
+  - [x] material
+  - [x] amp
+  - [x] bouncineess
+  - [x] add to objects.csv
 - [ ] TDW models 
   - [ ] Select
   - [ ] mass
@@ -17,6 +17,6 @@
   - [ ] amp
   - [ ] bouncineess
   - [ ] add to objects.csv
-- [ ] Library relative paths
+- [x] Library relative paths
 - [x] Environment collision
-- [ ] Sound20K semantic translation
+- [x] Sound20K semantic translation
