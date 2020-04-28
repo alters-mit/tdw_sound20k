@@ -381,7 +381,8 @@ class AudioDataset(Controller):
     def _is_moving(o_id: int, transforms: Transforms, rigidbodies: Rigidbodies) -> bool:
         """
         :param o_id: The ID of the object.
-        :param resp: The output data response.
+        :param transforms: The Transforms output data.
+        :param rigidbodies: The Rigidbodies output data.
 
         :return: True if the object is still moving.
         """
