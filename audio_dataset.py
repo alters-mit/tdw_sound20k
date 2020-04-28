@@ -39,7 +39,7 @@ class AudioDataset(Controller):
         sound20k_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
         for obj_info in sound20k_object_info:
             if obj_info in self.object_info:
-                self.object_info[obj_info] = sound20k_object_info[obj_info]
+                continue
             else:
                 self.object_info.update({obj_info: sound20k_object_info[obj_info]})
 
