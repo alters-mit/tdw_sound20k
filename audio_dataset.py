@@ -154,6 +154,8 @@ class AudioDataset(Controller):
                     model_index = 0
             if pbar is not None:
                 pbar.update(1)
+            # Unload the asset bundles (because we are done with these models).
+            self.communicate({"$type": "unload_asset_bundles"})
 
     def trial(self, scene: Scene, obj_name: str, obj_library: str, file_count: int) -> None:
         """
