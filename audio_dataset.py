@@ -1,7 +1,7 @@
 from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.py_impact import PyImpact, AudioMaterial
-from tdw.output_data import Bounds
+from tdw.output_data import OutputData, Bounds, Transforms, Rigidbodies, AudioSources
 from tdw.librarian import ModelLibrarian
 import numpy as np
 from pathlib import Path
@@ -102,6 +102,7 @@ class AudioDataset(Controller):
         for wnid in wnids:
             pbar.set_description(wnid)
             self.process_wnid(scenes, wnids[wnid], num_per_wnid, pbar)
+        self.communicate({"$type": "terminate"})
         pbar.close()
 
     def process_wnid(self, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
@@ -223,7 +224,9 @@ class AudioDataset(Controller):
                      "enter": True,
                      "exit": False,
                      "stay": False,
-                     "collision_types": ["obj", "env"]}]
+                     "collision_types": ["obj", "env"]},
+                    {"$type": "send_transforms",
+                     "frequency": "always"}]
         # Parse bounds data to get the centroid of all objects currently in the scene.
         bounds = Bounds(resp[0])
         if bounds.get_num() == 0:
@@ -304,16 +307,48 @@ class AudioDataset(Controller):
                 commands.append(impact_sound_command)
             # If there were no collisions, check for movement.
             if len(commands) == 0:
+                transforms = AudioDataset._get_transforms(resp)
                 done = True
                 for i in range(rigidbodies.get_num()):
-                    if not rigidbodies.get_sleeping(i):
+                    if self._is_moving(rigidbodies.get_id(i), transforms, rigidbodies):
                         done = False
                         break
             # Continue the trial.
             if not done:
                 resp = self.communicate(commands)
-        # Stop video capture.
+
+        # Stop audio capture.
         self.stop_recording()
+        # Stop listening for anything except audio data..
+        resp = self.communicate([{"$type": "send_rigidbodies",
+                                  "frequency": "never"},
+                                 {"$type": "send_transforms",
+                                  "frequency": "never"},
+                                 {"$type": "send_audio_sources",
+                                  "frequency": "always"},
+                                 {"$type": "send_collisions",
+                                  "enter": False,
+                                  "exit": False,
+                                  "stay": False,
+                                  "collision_types": []}])
+        # Wait for the audio to finish.
+        done = False
+        while not done:
+            done = True
+            for r in resp[:-1]:
+                if OutputData.get_data_type_id(r) == "audi":
+                    a = AudioSources(r)
+                    for i in range(a.get_num()):
+                        if a.get_is_playing(i):
+                            done = False
+            if not done:
+                resp = self.communicate([])
+        # Stop audio capture.
+        self.stop_recording()
+        # Cleanup.
+        self.communicate([{"$type": "send_audio_sources",
+                           "frequency": "never"},
+                          {"$type": "destroy_all_objects"}])
 
     def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
         """
@@ -328,3 +363,42 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
+
+    @staticmethod
+    def _get_transforms(resp: List[bytes]) -> Transforms:
+        """
+        :param resp: The output data response.
+
+        :return: Transforms data.
+        """
+
+        for r in resp[:-1]:
+            if OutputData.get_data_type_id(r) == "tran":
+                return Transforms(r)
+        raise Exception("Transforms output data not found!")
+
+    @staticmethod
+    def _is_moving(o_id: int, transforms: Transforms, rigidbodies: Rigidbodies) -> bool:
+        """
+        :param o_id: The ID of the object.
+        :param resp: The output data response.
+
+        :return: True if the object is still moving.
+        """
+
+        y: Optional[float] = None
+        sleeping: bool = False
+
+        for i in range(transforms.get_num()):
+            if transforms.get_id(i) == o_id:
+                y = transforms.get_position(i)[1]
+                break
+        assert y is not None, f"y value is none for {o_id}"
+
+        for i in range(rigidbodies.get_num()):
+            if rigidbodies.get_id(i) == o_id:
+                sleeping = rigidbodies.get_sleeping(i)
+                break
+        # If the object isn't sleeping, it is still moving.
+        # If the object fell into the abyss, we don't count it as moving (to prevent an infinitely long simulation).
+        return not sleeping and y > -10

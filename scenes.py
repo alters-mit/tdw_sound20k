@@ -38,10 +38,9 @@ class Scene(ABC):
 
         # Clean up all objects.
         Scene.OBJECT_IDS.clear()
-        commands = [{"$type": "destroy_all_objects"}]
 
         # Custom commands to initialize the scene.
-        commands.extend(self._initialize_scene(c))
+        commands = self._initialize_scene(c)[:]
 
         # Send bounds data (for the new objects).
         commands.append({"$type": "send_bounds",
