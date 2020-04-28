@@ -130,14 +130,18 @@ class AudioDataset(Controller):
         scene_index = 0
 
         while count < num_total:
-            self.trial(scene=scenes[scene_index], obj_name=models[model_index]["name"],
-                       obj_library=models[model_index]["library"], file_count=model_count)
+            try:
+                self.trial(scene=scenes[scene_index], obj_name=models[model_index]["name"],
+                           obj_library=models[model_index]["library"], file_count=model_count)
+            finally:
+                self.stop_recording()
+
             count += 1
             # Iterate through scenes.
             scene_count += 1
             if scene_count > num_scenes_per_model:
                 scene_index += 1
-                if scene_index > len(scenes):
+                if scene_index >= len(scenes):
                     scene_index = 0
             # Iterate through models.
             model_count += 1
@@ -146,7 +150,7 @@ class AudioDataset(Controller):
                 # If this is a new model, reset the scene count.
                 scene_index = 0
                 scene_count = 0
-                if model_index > len(models):
+                if model_index >= len(models):
                     model_index = 0
             if pbar is not None:
                 pbar.update(1)
@@ -161,7 +165,7 @@ class AudioDataset(Controller):
         :param file_count: The number of files with this object so far.
         """
 
-        self.py_impact.reset()
+        self.py_impact.reset(initial_amp=RNG.uniform(0.4, 0.9))
         obj_info = self.object_info[obj_name]
         record = self.libs[obj_library].get_record(obj_name)
 
@@ -180,9 +184,9 @@ class AudioDataset(Controller):
         center = scene.get_center(self)
 
         max_y = scene.get_max_y()
-        o_x = RNG.uniform(center["x"] - 0.05, center["x"] + 0.05)
+        o_x = RNG.uniform(center["x"] - 0.15, center["x"] + 0.15)
         o_y = RNG.uniform(max_y - 0.5, max_y)
-        o_z = RNG.uniform(center["z"] - 0.05, center["z"] + 0.05)
+        o_z = RNG.uniform(center["z"] - 0.15, center["z"] + 0.15)
         o_id = 0
         # Create the object and apply a force.
         commands = [{"$type": "add_object",
@@ -206,7 +210,7 @@ class AudioDataset(Controller):
                      "axis": "yaw",
                      "is_world": True},
                     {"$type": "rotate_object_by",
-                     "angle": RNG.uniform(0, 20),
+                     "angle": RNG.uniform(0, 45),
                      "id": o_id,
                      "axis": "pitch",
                      "is_world": True},
@@ -216,7 +220,7 @@ class AudioDataset(Controller):
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 4),
+                     "magnitude": RNG.uniform(0, 16),
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
@@ -241,7 +245,7 @@ class AudioDataset(Controller):
                        "y": sum(centers_y) / centers_len,
                        "z": sum(centers_z) / centers_len}
         # Add the avatar.
-        r = RNG.uniform(2.3, 4.6)
+        r = RNG.uniform(1.5, 4.5)
         a_x = center["x"] + r
         a_y = RNG.uniform(1.5, 3)
         a_z = center["y"] + r
@@ -317,8 +321,6 @@ class AudioDataset(Controller):
             if not done:
                 resp = self.communicate(commands)
 
-        # Stop audio capture.
-        self.stop_recording()
         # Stop listening for anything except audio data..
         resp = self.communicate([{"$type": "send_rigidbodies",
                                   "frequency": "never"},
@@ -337,9 +339,9 @@ class AudioDataset(Controller):
             done = True
             for r in resp[:-1]:
                 if OutputData.get_data_type_id(r) == "audi":
-                    a = AudioSources(r)
-                    for i in range(a.get_num()):
-                        if a.get_is_playing(i):
+                    audio_sources = AudioSources(r)
+                    for i in range(audio_sources.get_num()):
+                        if audio_sources.get_is_playing(i):
                             done = False
             if not done:
                 resp = self.communicate([])
@@ -403,3 +405,13 @@ class AudioDataset(Controller):
         # If the object isn't sleeping, it is still moving.
         # If the object fell into the abyss, we don't count it as moving (to prevent an infinitely long simulation).
         return not sleeping and y > -10
+
+
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("--dir", type=str, default="D:/audio_dataset", help="Output directory")
+    args = parser.parse_args()
+
+    a = AudioDataset(output_dir=Path(args.dir))
+    a.sound20k()
