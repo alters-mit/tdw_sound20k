@@ -245,7 +245,7 @@ class AudioDataset(Controller):
                        "y": sum(centers_y) / centers_len,
                        "z": sum(centers_z) / centers_len}
         # Add the avatar.
-        r = RNG.uniform(1.5, 4.5)
+        r = RNG.uniform(1.5, 3.5)
         a_x = center["x"] + r
         a_y = RNG.uniform(1.5, 3)
         a_z = center["y"] + r
