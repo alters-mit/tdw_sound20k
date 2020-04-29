@@ -172,7 +172,7 @@ class AudioDataset(Controller):
         :param output_path: Write the .wav file to this path.
         """
 
-        self.py_impact.reset(initial_amp=RNG.uniform(0.4, 0.7))
+        self.py_impact.reset(initial_amp=RNG.uniform(0.01, 0.05))
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
