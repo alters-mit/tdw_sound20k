@@ -2,7 +2,7 @@ from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.py_impact import PyImpact, AudioMaterial
 from tdw.output_data import OutputData, Bounds, Transforms, Rigidbodies, AudioSources
-from tdw.librarian import ModelLibrarian
+from tdw.librarian import ModelLibrarian, ModelRecord
 import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
@@ -76,14 +76,20 @@ class AudioDataset(Controller):
 
         dir_util.remove_tree(str(self.output_dir.resolve()))
 
-    def stop_recording(self) -> None:
+    def stop_recording(self, path: Optional[Path] = None) -> None:
         """
         Kill the recording process.
+
+        :param path: If not none, remove the file at this path (presumably because it is an incomplete audio file).
         """
 
+        # Stop recording.
         if self.recorder_pid is not None:
             with open(devnull, "w+") as f:
                 call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
+            # Remove the incomplete file.
+            if path is not None and path.exists():
+                path.unlink()
 
     def sound20k(self, total: int = 28602) -> None:
         """
@@ -130,11 +136,16 @@ class AudioDataset(Controller):
         scene_index = 0
 
         while count < num_total:
-            try:
-                self.trial(scene=scenes[scene_index], obj_name=models[model_index]["name"],
-                           obj_library=models[model_index]["library"], file_count=model_count)
-            finally:
-                self.stop_recording()
+            output_path, record = self._get_output_path(obj_name=models[model_index]["name"],
+                                                        obj_library=models[model_index]["library"],
+                                                        file_count=model_count)
+            # Do a trial if the file doesn't exist yet.
+            if not output_path.exists():
+                try:
+                    self.trial(scene=scenes[scene_index], record=record, output_path=output_path)
+                finally:
+                    # If the trial is interrupted, kill the recording here. Remove the incomplete file.
+                    self.stop_recording(path=output_path)
 
             count += 1
             # Iterate through scenes.
@@ -152,34 +163,21 @@ class AudioDataset(Controller):
                 scene_count = 0
                 if model_index >= len(models):
                     model_index = 0
+                # Unload the asset bundles because we are done with this model.
+                self.communicate({"$type": "unload_asset_bundles"})
             if pbar is not None:
                 pbar.update(1)
-            # Unload the asset bundles (because we are done with these models).
-            self.communicate({"$type": "unload_asset_bundles"})
 
-    def trial(self, scene: Scene, obj_name: str, obj_library: str, file_count: int) -> None:
+    def trial(self, scene: Scene, record: ModelRecord, output_path: Path) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
-        :param obj_name: The name of the object that will be dropped.
-        :param obj_library: The object's library.
-        :param file_count: The number of files with this object so far.
+        :param record: The model's metadata record.
+        :param output_path: Write the .wav file to this path.
         """
 
         self.py_impact.reset(initial_amp=RNG.uniform(0.4, 0.9))
-        obj_info = self.object_info[obj_name]
-        record = self.libs[obj_library].get_record(obj_name)
-
-        output_dir = self.output_dir.joinpath(record.wnid)
-        if not output_dir.exists():
-            output_dir.mkdir(parents=True)
-
-        filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
-        output_path = output_dir.joinpath(filename)
-        # Skip files that already exist.
-        while output_path.exists():
-            return
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
@@ -200,10 +198,10 @@ class AudioDataset(Controller):
                      "id": o_id},
                     {"$type": "set_mass",
                      "id": o_id,
-                     "mass": obj_info.mass},
+                     "mass": self.object_info[record.name].mass},
                     {"$type": "set_physic_material",
                      "id": o_id,
-                     "bounciness": obj_info.bounciness,
+                     "bounciness": self.object_info[record.name].bounciness,
                      "static_friction": 0.1,
                      "dynamic_friction": 0.8},
                     {"$type": "rotate_object_by",
@@ -247,6 +245,8 @@ class AudioDataset(Controller):
                        "y": sum(centers_y) / centers_len,
                        "z": sum(centers_z) / centers_len}
         # Add the avatar.
+        # Set the position at a given distance (r) from the center of the scene.
+        # Rotate around that position to a random angle constrained by the scene's min and max angles.
         r = RNG.uniform(1.5, 3.5)
         a_x = center["x"] + r
         a_y = RNG.uniform(1.5, 3)
@@ -265,6 +265,8 @@ class AudioDataset(Controller):
 
         # Send the commands.
         resp = self.communicate(commands)
+
+        # Begin audio recording.
         with open(devnull, "w+") as f:
             self.recorder_pid = Popen(["fmedia",
                                        "--record",
@@ -277,13 +279,14 @@ class AudioDataset(Controller):
         while not done:
             commands = []
             collisions, environment_collisions, rigidbodies = PyImpact.get_collisions(resp)
+            # Create impact sounds from object-object collisions.
             for collision in collisions:
                 if PyImpact.is_valid_collision(collision):
                     # Get the audio material and amp.
                     collider_id = collision.get_collider_id()
-                    collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, obj_name)
+                    collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, record.name)
                     collidee_id = collision.get_collider_id()
-                    collidee_material, collidee_amp = self._get_object_info(collidee_id, Scene.OBJECT_IDS, obj_name)
+                    collidee_material, collidee_amp = self._get_object_info(collidee_id, Scene.OBJECT_IDS, record.name)
                     impact_sound_command = self.py_impact.get_impact_sound_command(
                         collision=collision,
                         rigidbodies=rigidbodies,
@@ -295,10 +298,10 @@ class AudioDataset(Controller):
                         other_amp=collider_amp,
                         play_audio_data=scene.audio_system.play_audio_data())
                     commands.append(impact_sound_command)
-            # Handle environment collision.
+            # Create impact sounds from object-environment collisions.
             for collision in environment_collisions:
                 collider_id = collision.get_object_id()
-                collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, obj_name)
+                collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, record.name)
                 surface_material = scene.get_surface_material()
                 impact_sound_command = self.py_impact.get_impact_sound_command(
                     collision=collision,
@@ -311,7 +314,7 @@ class AudioDataset(Controller):
                     other_mat=surface_material.name,
                     play_audio_data=scene.audio_system.play_audio_data())
                 commands.append(impact_sound_command)
-            # If there were no collisions, check for movement.
+            # If there were no collisions, check for movement. If nothing is moving, the trial is done.
             if len(commands) == 0:
                 transforms = AudioDataset._get_transforms(resp)
                 done = True
@@ -328,13 +331,13 @@ class AudioDataset(Controller):
                                   "frequency": "never"},
                                  {"$type": "send_transforms",
                                   "frequency": "never"},
-                                 {"$type": "send_audio_sources",
-                                  "frequency": "always"},
                                  {"$type": "send_collisions",
                                   "enter": False,
                                   "exit": False,
                                   "stay": False,
-                                  "collision_types": []}])
+                                  "collision_types": []},
+                                 {"$type": "send_audio_sources",
+                                  "frequency": "always"}])
         # Wait for the audio to finish.
         done = False
         while not done:
@@ -347,7 +350,7 @@ class AudioDataset(Controller):
                             done = False
             if not done:
                 resp = self.communicate([])
-        # Stop audio capture.
+        # Stop recording.
         self.stop_recording()
         # Cleanup.
         self.communicate([{"$type": "send_audio_sources",
@@ -367,6 +370,24 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
+
+    def _get_output_path(self, obj_name: str, obj_library: str, file_count: int) -> Tuple[Path, ModelRecord]:
+        """
+        :param obj_name: The model name.
+        :param obj_library: The model record's metadata library.
+        :param file_count: The number of files with this model so far.
+
+        :return: The path to the next file to be written.
+        """
+
+        record = self.libs[obj_library].get_record(obj_name)
+
+        output_dir = self.output_dir.joinpath(record.wnid)
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
+
+        filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
+        return output_dir.joinpath(filename), record
 
     @staticmethod
     def _get_transforms(resp: List[bytes]) -> Transforms:
