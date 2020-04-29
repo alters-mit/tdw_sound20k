@@ -76,20 +76,15 @@ class AudioDataset(Controller):
 
         dir_util.remove_tree(str(self.output_dir.resolve()))
 
-    def stop_recording(self, path: Optional[Path] = None) -> None:
+    def stop_recording(self) -> None:
         """
         Kill the recording process.
-
-        :param path: If not none, remove the file at this path (presumably because it is an incomplete audio file).
         """
 
         # Stop recording.
         if self.recorder_pid is not None:
             with open(devnull, "w+") as f:
                 call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
-            # Remove the incomplete file.
-            if path is not None and path.exists():
-                path.unlink()
 
     def sound20k(self, total: int = 28602) -> None:
         """
@@ -144,8 +139,8 @@ class AudioDataset(Controller):
                 try:
                     self.trial(scene=scenes[scene_index], record=record, output_path=output_path)
                 finally:
-                    # If the trial is interrupted, kill the recording here. Remove the incomplete file.
-                    self.stop_recording(path=output_path)
+                    # Stop recording audio.
+                    self.stop_recording()
 
             count += 1
             # Iterate through scenes.
@@ -177,7 +172,7 @@ class AudioDataset(Controller):
         :param output_path: Write the .wav file to this path.
         """
 
-        self.py_impact.reset(initial_amp=RNG.uniform(0.4, 0.9))
+        self.py_impact.reset(initial_amp=RNG.uniform(0.4, 0.7))
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
@@ -202,8 +197,8 @@ class AudioDataset(Controller):
                     {"$type": "set_physic_material",
                      "id": o_id,
                      "bounciness": self.object_info[record.name].bounciness,
-                     "static_friction": 0.1,
-                     "dynamic_friction": 0.8},
+                     "static_friction": RNG.uniform(0.1, 0.3),
+                     "dynamic_friction": RNG.uniform(0.6, 0.9)},
                     {"$type": "rotate_object_by",
                      "angle": RNG.uniform(-30, 30),
                      "id": o_id,
@@ -220,7 +215,7 @@ class AudioDataset(Controller):
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 16),
+                     "magnitude": RNG.uniform(0, 10),
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
@@ -350,8 +345,6 @@ class AudioDataset(Controller):
                             done = False
             if not done:
                 resp = self.communicate([])
-        # Stop recording.
-        self.stop_recording()
         # Cleanup.
         self.communicate([{"$type": "send_audio_sources",
                            "frequency": "never"},
