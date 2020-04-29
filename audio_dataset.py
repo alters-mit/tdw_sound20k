@@ -172,7 +172,7 @@ class AudioDataset(Controller):
         :param output_path: Write the .wav file to this path.
         """
 
-        self.py_impact.reset(initial_amp=RNG.uniform(0.01, 0.05))
+        self.py_impact.reset(initial_amp=RNG.uniform(0.1, 0.4))
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
@@ -198,7 +198,7 @@ class AudioDataset(Controller):
                      "id": o_id,
                      "bounciness": self.object_info[record.name].bounciness,
                      "static_friction": RNG.uniform(0.1, 0.3),
-                     "dynamic_friction": RNG.uniform(0.6, 0.9)},
+                     "dynamic_friction": RNG.uniform(0.7, 0.9)},
                     {"$type": "rotate_object_by",
                      "angle": RNG.uniform(-30, 30),
                      "id": o_id,
@@ -215,7 +215,7 @@ class AudioDataset(Controller):
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 10),
+                     "magnitude": RNG.uniform(0, 6),
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
