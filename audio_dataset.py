@@ -97,6 +97,30 @@ class AudioDataset(Controller):
         wnids = loads(Path("models/wnids_sound20k.json").read_text(encoding="utf-8"))
         num_per_wnid = int(total / len(wnids))
 
+        # Load the scene.
+        # Create a reverb space.
+        # Create the avatar.
+        # Add an audio sensor.
+        # Disable the image sensor.
+        self.communicate([{"$type": "load_scene"},
+                          TDWUtils.create_empty_room(12, 12),
+                          {"$type": "set_proc_gen_walls_scale",
+                           "walls": TDWUtils.get_box(12, 12),
+                           "scale": {"x": 1, "y": 4, "z": 1}},
+                          {"$type": "set_reverb_space_simple",
+                           "env_id": 0,
+                           "reverb_floor_material": "parquet",
+                           "reverb_ceiling_material": "acousticTile",
+                           "reverb_front_wall_material": "smoothPlaster",
+                           "reverb_back_wall_material": "smoothPlaster",
+                           "reverb_left_wall_material": "smoothPlaster",
+                           "reverb_right_wall_material": "smoothPlaster"},
+                          {"$type": "create_avatar",
+                           "type": "A_Img_Caps_Kinematic",
+                           "id": "a"},
+                          {"$type": "add_environ_audio_sensor"},
+                          {"$type": "toggle_image_sensor"}])
+
         scenes = get_sound20k_scenes()
         pbar = tqdm(total=total)
 
@@ -153,6 +177,7 @@ class AudioDataset(Controller):
             model_count += 1
             if model_count > num_images_per_model:
                 model_index += 1
+                model_count = 0
                 # If this is a new model, reset the scene count.
                 scene_index = 0
                 scene_count = 0
@@ -251,12 +276,10 @@ class AudioDataset(Controller):
         rad = np.radians(theta)
         a_x = np.cos(rad) * (a_x - center["x"]) - np.sin(rad) * (a_z - center["z"]) + center["x"]
         a_z = np.sin(rad) * (a_x - center["x"]) + np.cos(rad) * (a_z - center["z"]) + center["z"]
-        commands.extend(TDWUtils.create_avatar(position={"x": a_x, "y": a_y, "z": a_z},
-                                               look_at=look_at))
-        # Add the audio sensor.
-        # Disable the image sensor (this is audio-only).
-        commands.extend([scene.audio_system.add_audio_sensor(),
-                         {"$type": "toggle_image_sensor"}])
+        commands.extend([{"$type": "teleport_avatar_to",
+                          "position": {"x": a_x, "y": a_y, "z": a_z}},
+                         {"$type": "look_at_position",
+                          "position": look_at}])
 
         # Send the commands.
         resp = self.communicate(commands)
@@ -291,24 +314,25 @@ class AudioDataset(Controller):
                         other_id=collider_id,
                         other_mat=collider_material.name,
                         other_amp=collider_amp,
-                        play_audio_data=scene.audio_system.play_audio_data())
+                        play_audio_data=False)
                     commands.append(impact_sound_command)
             # Create impact sounds from object-environment collisions.
             for collision in environment_collisions:
                 collider_id = collision.get_object_id()
-                collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, record.name)
-                surface_material = scene.get_surface_material()
-                impact_sound_command = self.py_impact.get_impact_sound_command(
-                    collision=collision,
-                    rigidbodies=rigidbodies,
-                    target_id=collider_id,
-                    target_amp=collider_amp,
-                    target_mat=collider_material.name,
-                    other_id=-1,
-                    other_amp=0.1,
-                    other_mat=surface_material.name,
-                    play_audio_data=scene.audio_system.play_audio_data())
-                commands.append(impact_sound_command)
+                if self._get_velocity(rigidbodies, collider_id) > 0:
+                    collider_material, collider_amp = self._get_object_info(collider_id, Scene.OBJECT_IDS, record.name)
+                    surface_material = scene.get_surface_material()
+                    impact_sound_command = self.py_impact.get_impact_sound_command(
+                        collision=collision,
+                        rigidbodies=rigidbodies,
+                        target_id=collider_id,
+                        target_amp=collider_amp,
+                        target_mat=collider_material.name,
+                        other_id=-1,
+                        other_amp=0.1,
+                        other_mat=surface_material.name,
+                        play_audio_data=False)
+                    commands.append(impact_sound_command)
             # If there were no collisions, check for movement. If nothing is moving, the trial is done.
             if len(commands) == 0:
                 transforms = AudioDataset._get_transforms(resp)
@@ -346,9 +370,14 @@ class AudioDataset(Controller):
             if not done:
                 resp = self.communicate([])
         # Cleanup.
-        self.communicate([{"$type": "send_audio_sources",
-                           "frequency": "never"},
-                          {"$type": "destroy_all_objects"}])
+        commands = [{"$type": "send_audio_sources",
+                     "frequency": "never"},
+                    {"$type": "destroy_object",
+                     "id": o_id}]
+        for scene_object_id in Scene.OBJECT_IDS:
+            commands.append({"$type": "destroy_object",
+                             "id": scene_object_id})
+        self.communicate(commands)
 
     def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
         """
@@ -394,6 +423,19 @@ class AudioDataset(Controller):
             if OutputData.get_data_type_id(r) == "tran":
                 return Transforms(r)
         raise Exception("Transforms output data not found!")
+
+    @staticmethod
+    def _get_velocity(rigidbodies: Rigidbodies, o_id: int) -> float:
+        """
+        :param rigidbodies: The rigidbody data.
+        :param o_id: The ID of the object.
+
+        :return: The velocity magnitude of the object.
+        """
+
+        for i in range(rigidbodies.get_num()):
+            if rigidbodies.get_id(i) == o_id:
+                return np.linalg.norm(rigidbodies.get_velocity(i))
 
     @staticmethod
     def _is_moving(o_id: int, transforms: Transforms, rigidbodies: Rigidbodies) -> bool:

@@ -2,7 +2,6 @@ from tdw.controller import Controller
 from tdw.tdw_utils import TDWUtils
 from tdw.librarian import ModelLibrarian
 from tdw.py_impact import PyImpact, AudioMaterial
-from audio_system import ResonanceAudio, AudioSystem
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -23,10 +22,6 @@ class Scene(ABC):
     for obj in _custom_object_info:
         _OBJECT_INFO.update({obj: _custom_object_info[obj]})
 
-    def __init__(self):
-        # Get the audio system.
-        self.audio_system = self._get_audio_system()
-
     def initialize_scene(self, c: Controller) -> List[dict]:
         """
         Add these commands to the beginning of the list of initialization commands.
@@ -45,11 +40,6 @@ class Scene(ABC):
         # Send bounds data (for the new objects).
         commands.append({"$type": "send_bounds",
                          "frequency": "once"})
-
-        # Initialize audio.
-        init_audio = self.audio_system.init_audio()
-        if init_audio is not None:
-            commands.append(init_audio)
 
         return commands
 
@@ -125,33 +115,20 @@ class Scene(ABC):
 
         raise Exception()
 
-    @abstractmethod
-    def _get_audio_system(self) -> AudioSystem:
-        """
-        :return: The audio system used in this scene.
-        """
-
-        raise Exception()
-
 
 class _ProcGenRoom(Scene, ABC):
     """
     Initialize the ProcGen room.
     """
 
-    def _initialize_scene(self, c: Controller) -> List[dict]:
-        # Load the scene and an empty room.
-        return [{"$type": "load_scene"},
-                TDWUtils.create_empty_room(12, 12),
-                {"$type": "set_proc_gen_walls_scale",
-                 "walls": TDWUtils.get_box(12, 12),
-                 "scale": {"x": 1, "y": 4, "z": 1}}]
-
     def get_max_y(self) -> float:
         return 3.5
 
     def get_surface_material(self) -> AudioMaterial:
         return AudioMaterial.hardwood
+
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        return []
 
 
 class FloorSound20k(_ProcGenRoom):
@@ -161,9 +138,6 @@ class FloorSound20k(_ProcGenRoom):
 
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 0, "y": 0, "z": 0}
-
-    def _get_audio_system(self) -> AudioSystem:
-        return ResonanceAudio()
 
 
 class CornerSound20k(_ProcGenRoom):
@@ -178,9 +152,6 @@ class CornerSound20k(_ProcGenRoom):
     @staticmethod
     def get_camera_angles() -> Tuple[float, float]:
         return 120, 250
-
-    def _get_audio_system(self) -> AudioSystem:
-        return ResonanceAudio()
 
 
 class _FloorWithObject(FloorSound20k):
