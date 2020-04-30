@@ -171,8 +171,8 @@ class AudioDataset(Controller):
         :param record: The model's metadata record.
         :param output_path: Write the .wav file to this path.
         """
-
-        self.py_impact.reset(initial_amp=RNG.uniform(0.1, 0.4))
+        
+        self.py_impact.reset(initial_amp=0.02)
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
@@ -242,7 +242,7 @@ class AudioDataset(Controller):
         # Add the avatar.
         # Set the position at a given distance (r) from the center of the scene.
         # Rotate around that position to a random angle constrained by the scene's min and max angles.
-        r = RNG.uniform(1.5, 3.5)
+        r = RNG.uniform(1.5, 2.2)
         a_x = center["x"] + r
         a_y = RNG.uniform(1.5, 3)
         a_z = center["y"] + r
