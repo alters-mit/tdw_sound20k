@@ -171,18 +171,19 @@ class AudioDataset(Controller):
             scene_count += 1
             if scene_count > num_scenes_per_model:
                 scene_index += 1
+                scene_count = 0
                 if scene_index >= len(scenes):
                     scene_index = 0
             # Iterate through models.
             model_count += 1
             if model_count > num_images_per_model:
                 model_index += 1
+                if model_index >= len(models):
+                    model_index = 0
                 model_count = 0
                 # If this is a new model, reset the scene count.
                 scene_index = 0
                 scene_count = 0
-                if model_index >= len(models):
-                    model_index = 0
                 # Unload the asset bundles because we are done with this model.
                 self.communicate({"$type": "unload_asset_bundles"})
             if pbar is not None:
