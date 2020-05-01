@@ -243,7 +243,7 @@ class StairRamp(_FloorWithObject):
         commands = super()._initialize_scene(c)
         commands.append({"$type": "teleport_object",
                          "id": list(Scene.OBJECT_IDS.keys())[0],
-                         "position": {"x": 0, "y": 0, "z": -0.25}})
+                         "position": {"x": 0, "y": 0, "z": -0.3}})
         return commands
 
 
