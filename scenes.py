@@ -376,4 +376,3 @@ def get_sound20k_scenes() -> List[Scene]:
 
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
             DeskAndChair(), DiningTableAndChairs()]
-
