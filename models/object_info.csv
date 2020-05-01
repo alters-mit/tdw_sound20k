@@ -2,5 +2,5 @@
 birdhouse_0,0.3,6,wood,models/models.json,0.6
 birdhouse_1,0.3,6,wood,models/models.json,0.6
 microphone,0.02,1,wood,models/models.json,0.6
-stair_ramp,0.1,1000,hardwood,models/models.json,0.6
-uneven_terrain,0.1,1000,cardboard,models/models.json,0.3
+stair_ramp,0.02,1000,hardwood,models/models.json,0.6
+uneven_terrain,0.01,1000,cardboard,models/models.json,0.3

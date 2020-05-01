@@ -197,24 +197,24 @@ class AudioDataset(Controller):
         :param record: The model's metadata record.
         :param output_path: Write the .wav file to this path.
         """
-        
-        self.py_impact.reset(initial_amp=0.02)
+
+        self.py_impact.reset(initial_amp=0.05)
 
         # Initialize the scene, positioning objects, furniture, etc.
         resp = self.communicate(scene.initialize_scene(self))
         center = scene.get_center(self)
 
         max_y = scene.get_max_y()
-        o_x = RNG.uniform(center["x"] - 0.15, center["x"] + 0.15)
-        o_y = RNG.uniform(max_y - 0.5, max_y)
-        o_z = RNG.uniform(center["z"] - 0.15, center["z"] + 0.15)
+
         o_id = 0
         # Create the object and apply a force.
         commands = [{"$type": "add_object",
                      "name": record.name,
                      "url": record.get_url(),
                      "scale_factor": record.scale_factor,
-                     "position": {"x": o_x, "y": o_y, "z": o_z},
+                     "position": {"x": RNG.uniform(center["x"] - 0.15, center["x"] + 0.15),
+                                  "y": RNG.uniform(max_y - 0.5, max_y),
+                                  "z": RNG.uniform(center["z"] - 0.15, center["z"] + 0.15)},
                      "category": record.wcategory,
                      "id": o_id},
                     {"$type": "set_mass",
@@ -241,7 +241,7 @@ class AudioDataset(Controller):
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 6),
+                     "magnitude": RNG.uniform(0, 5),
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
@@ -268,15 +268,14 @@ class AudioDataset(Controller):
         # Add the avatar.
         # Set the position at a given distance (r) from the center of the scene.
         # Rotate around that position to a random angle constrained by the scene's min and max angles.
-        r = RNG.uniform(1.5, 2.2)
-        a_x = center["x"] + r
+        a_r = RNG.uniform(1.5, 2.2)
+        a_x = center["x"] + a_r
         a_y = RNG.uniform(1.5, 3)
-        a_z = center["y"] + r
+        a_z = center["z"] + a_r
         cam_angle_min, cam_angle_max = scene.get_camera_angles()
-        theta = RNG.uniform(cam_angle_min, cam_angle_max)
-        rad = np.radians(theta)
-        a_x = np.cos(rad) * (a_x - center["x"]) - np.sin(rad) * (a_z - center["z"]) + center["x"]
-        a_z = np.sin(rad) * (a_x - center["x"]) + np.cos(rad) * (a_z - center["z"]) + center["z"]
+        theta = np.radians(RNG.uniform(cam_angle_min, cam_angle_max))
+        a_x = np.cos(theta) * (a_x - center["x"]) - np.sin(theta) * (a_z - center["z"]) + center["x"]
+        a_z = np.sin(theta) * (a_x - center["x"]) + np.cos(theta) * (a_z - center["z"]) + center["z"]
         commands.extend([{"$type": "teleport_avatar_to",
                           "position": {"x": a_x, "y": a_y, "z": a_z}},
                          {"$type": "look_at_position",
@@ -330,7 +329,7 @@ class AudioDataset(Controller):
                         target_amp=collider_amp,
                         target_mat=collider_material.name,
                         other_id=-1,
-                        other_amp=0.1,
+                        other_amp=0.01,
                         other_mat=surface_material.name,
                         play_audio_data=False)
                     commands.append(impact_sound_command)
