@@ -289,6 +289,7 @@ class AudioDataset(Controller):
             self.recorder_pid = Popen(["fmedia",
                                        "--record",
                                        f"--dev-capture={self.capture_device}",
+                                       "--until=10",
                                        f"--out={str(output_path.resolve())}"],
                                       stderr=f).pid
 
