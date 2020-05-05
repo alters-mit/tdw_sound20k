@@ -14,6 +14,8 @@ from distutils import dir_util
 from os import devnull
 from tqdm import tqdm
 import re
+import sqlite3
+import json
 
 RNG = np.random.RandomState(0)
 
@@ -30,6 +32,20 @@ class AudioDataset(Controller):
         self.output_dir = output_dir
         if not self.output_dir.exists():
             self.output_dir.mkdir(parents=True)
+
+        db_path = self.output_dir.joinpath('results.db')
+        self.conn = sqlite3.connect(str(db_path.resolve()))
+        self.db_c = self.conn.cursor()
+        # Sound20K table.
+        if self.db_c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sound20k'").\
+                fetchone() is None:
+            self.db_c.execute("CREATE TABLE sound20k (path text, scene integer, cam_x real, cam_y real, cam_z real,"
+                              "obj_x real, obj_y real, obj_z real, mass real, static_friction real, dynamic_friction "
+                              "real, yaw real, pitch real, roll real, force real)")
+        # Scenes table.
+        if self.db_c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='scenes'").\
+                fetchone() is None:
+            self.db_c.execute("CREATE TABLE scenes (id integer, commands text)")
 
         self.py_impact = PyImpact()
 
@@ -55,6 +71,25 @@ class AudioDataset(Controller):
         dev_search = re.search("device #(.*): Stereo Mix", devices, flags=re.MULTILINE)
         assert dev_search is not None, "No suitable audio capture device found:\n" + devices
         self.capture_device = dev_search.group(1)
+
+        self.sound20k_init_commands = [{"$type": "load_scene"},
+                                       TDWUtils.create_empty_room(12, 12),
+                                       {"$type": "set_proc_gen_walls_scale",
+                                        "walls": TDWUtils.get_box(12, 12),
+                                        "scale": {"x": 1, "y": 4, "z": 1}},
+                                       {"$type": "set_reverb_space_simple",
+                                        "env_id": 0,
+                                        "reverb_floor_material": "parquet",
+                                        "reverb_ceiling_material": "acousticTile",
+                                        "reverb_front_wall_material": "smoothPlaster",
+                                        "reverb_back_wall_material": "smoothPlaster",
+                                        "reverb_left_wall_material": "smoothPlaster",
+                                        "reverb_right_wall_material": "smoothPlaster"},
+                                       {"$type": "create_avatar",
+                                        "type": "A_Img_Caps_Kinematic",
+                                        "id": "a"},
+                                       {"$type": "add_environ_audio_sensor"},
+                                       {"$type": "toggle_image_sensor"}]
 
         super().__init__(port=port)
 
@@ -98,28 +133,7 @@ class AudioDataset(Controller):
         num_per_wnid = int(total / len(wnids))
 
         # Load the scene.
-        # Create a reverb space.
-        # Create the avatar.
-        # Add an audio sensor.
-        # Disable the image sensor.
-        self.communicate([{"$type": "load_scene"},
-                          TDWUtils.create_empty_room(12, 12),
-                          {"$type": "set_proc_gen_walls_scale",
-                           "walls": TDWUtils.get_box(12, 12),
-                           "scale": {"x": 1, "y": 4, "z": 1}},
-                          {"$type": "set_reverb_space_simple",
-                           "env_id": 0,
-                           "reverb_floor_material": "parquet",
-                           "reverb_ceiling_material": "acousticTile",
-                           "reverb_front_wall_material": "smoothPlaster",
-                           "reverb_back_wall_material": "smoothPlaster",
-                           "reverb_left_wall_material": "smoothPlaster",
-                           "reverb_right_wall_material": "smoothPlaster"},
-                          {"$type": "create_avatar",
-                           "type": "A_Img_Caps_Kinematic",
-                           "id": "a"},
-                          {"$type": "add_environ_audio_sensor"},
-                          {"$type": "toggle_image_sensor"}])
+        self.communicate(self.sound20k_init_commands)
 
         scenes = get_sound20k_scenes()
         pbar = tqdm(total=total)
@@ -161,7 +175,10 @@ class AudioDataset(Controller):
             # Do a trial if the file doesn't exist yet.
             if not output_path.exists():
                 try:
-                    self.trial(scene=scenes[scene_index], record=record, output_path=output_path)
+                    self.trial(scene=scenes[scene_index],
+                               record=record,
+                               output_path=output_path,
+                               scene_index=scene_index)
                 finally:
                     # Stop recording audio.
                     self.stop_recording()
@@ -170,6 +187,13 @@ class AudioDataset(Controller):
             # Iterate through scenes.
             scene_count += 1
             if scene_count > num_scenes_per_model:
+                # Add the scene to the database.
+                scene_db = self.db_c.execute("SELECT * FROM scenes WHERE id=?", (scene_index,)).fetchone()
+                if scene_db is None:
+                    self.db_c.execute("INSERT INTO scenes VALUES(?,?)",
+                                      (scene_index, json.dumps(self.sound20k_init_commands[:] +
+                                                               scenes[scene_index].initialize_scene(self))))
+                    self.conn.commit()
                 scene_index += 1
                 scene_count = 0
                 if scene_index >= len(scenes):
@@ -189,13 +213,14 @@ class AudioDataset(Controller):
             if pbar is not None:
                 pbar.update(1)
 
-    def trial(self, scene: Scene, record: ModelRecord, output_path: Path) -> None:
+    def trial(self, scene: Scene, record: ModelRecord, output_path: Path, scene_index: int) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
         :param record: The model's metadata record.
         :param output_path: Write the .wav file to this path.
+        :param scene_index: The scene identifier.
         """
 
         self.py_impact.reset(initial_amp=0.05)
@@ -206,42 +231,67 @@ class AudioDataset(Controller):
 
         max_y = scene.get_max_y()
 
+        # The object's initial position.
+        o_x = RNG.uniform(center["x"] - 0.15, center["x"] + 0.15)
+        o_y = RNG.uniform(max_y - 0.5, max_y)
+        o_z = RNG.uniform(center["z"] - 0.15, center["z"] + 0.15)
+        # Physics values.
+        mass = self.object_info[record.name].mass + RNG.uniform(self.object_info[record.name].mass * -0.15,
+                                                                self.object_info[record.name].mass * 0.15)
+        static_friction = RNG.uniform(0.1, 0.3)
+        dynamic_friction = RNG.uniform(0.7, 0.9)
+        # Angles of rotation.
+        yaw = RNG.uniform(-30, 30)
+        pitch = RNG.uniform(0, 45)
+        roll = RNG.uniform(-45, 45)
+        # The force applied to the object.
+        force = RNG.uniform(0, 5)
+        # The avatar's position.
+        a_r = RNG.uniform(1.5, 2.2)
+        a_x = center["x"] + a_r
+        a_y = RNG.uniform(1.5, 3)
+        a_z = center["z"] + a_r
+        cam_angle_min, cam_angle_max = scene.get_camera_angles()
+        theta = np.radians(RNG.uniform(cam_angle_min, cam_angle_max))
+        a_x = np.cos(theta) * (a_x - center["x"]) - np.sin(theta) * (a_z - center["z"]) + center["x"]
+        a_z = np.sin(theta) * (a_x - center["x"]) + np.cos(theta) * (a_z - center["z"]) + center["z"]
+
         o_id = 0
         # Create the object and apply a force.
         commands = [{"$type": "add_object",
                      "name": record.name,
                      "url": record.get_url(),
                      "scale_factor": record.scale_factor,
-                     "position": {"x": RNG.uniform(center["x"] - 0.15, center["x"] + 0.15),
-                                  "y": RNG.uniform(max_y - 0.5, max_y),
-                                  "z": RNG.uniform(center["z"] - 0.15, center["z"] + 0.15)},
+                     "position": {"x": o_x,
+                                  "y": o_y,
+                                  "z": o_z},
                      "category": record.wcategory,
                      "id": o_id},
                     {"$type": "set_mass",
                      "id": o_id,
-                     "mass": self.object_info[record.name].mass},
+                     "mass": mass},
                     {"$type": "set_physic_material",
                      "id": o_id,
                      "bounciness": self.object_info[record.name].bounciness,
-                     "static_friction": RNG.uniform(0.1, 0.3),
-                     "dynamic_friction": RNG.uniform(0.7, 0.9)},
+                     "static_friction": static_friction,
+                     "dynamic_friction": dynamic_friction},
                     {"$type": "rotate_object_by",
-                     "angle": RNG.uniform(-30, 30),
+                     "angle": yaw,
                      "id": o_id,
                      "axis": "yaw",
                      "is_world": True},
                     {"$type": "rotate_object_by",
-                     "angle": RNG.uniform(0, 45),
+                     "angle": pitch,
                      "id": o_id,
                      "axis": "pitch",
                      "is_world": True},
                     {"$type": "rotate_object_by",
-                     "angle": RNG.uniform(-45, 45),
+                     "angle": roll,
                      "id": o_id,
                      "axis": "roll",
                      "is_world": True},
                     {"$type": "apply_force_magnitude_to_object",
-                     "magnitude": RNG.uniform(0, 5),
+                     "magnitude": force,
                      "id": o_id},
                     {"$type": "send_rigidbodies",
                      "frequency": "always"},
@@ -268,14 +318,6 @@ class AudioDataset(Controller):
         # Add the avatar.
         # Set the position at a given distance (r) from the center of the scene.
         # Rotate around that position to a random angle constrained by the scene's min and max angles.
-        a_r = RNG.uniform(1.5, 2.2)
-        a_x = center["x"] + a_r
-        a_y = RNG.uniform(1.5, 3)
-        a_z = center["z"] + a_r
-        cam_angle_min, cam_angle_max = scene.get_camera_angles()
-        theta = np.radians(RNG.uniform(cam_angle_min, cam_angle_max))
-        a_x = np.cos(theta) * (a_x - center["x"]) - np.sin(theta) * (a_z - center["z"]) + center["x"]
-        a_z = np.sin(theta) * (a_x - center["x"]) + np.cos(theta) * (a_z - center["z"]) + center["z"]
         commands.extend([{"$type": "teleport_avatar_to",
                           "position": {"x": a_x, "y": a_y, "z": a_z}},
                          {"$type": "look_at_position",
@@ -379,6 +421,12 @@ class AudioDataset(Controller):
             commands.append({"$type": "destroy_object",
                              "id": scene_object_id})
         self.communicate(commands)
+
+        # Insert the trial's values into the database.
+        self.db_c.execute("INSERT INTO sound20k VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                          (str(output_path.resolve()), scene_index, a_x, a_y, a_z, o_x, o_y, o_z, mass,
+                           static_friction, dynamic_friction, yaw, pitch, roll, force))
+        self.conn.commit()
 
     def _get_object_info(self, o_id: int, object_ids: Dict[int, str], drop_name: str) -> Tuple[AudioMaterial, float]:
         """
