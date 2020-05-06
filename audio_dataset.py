@@ -16,6 +16,7 @@ from tqdm import tqdm
 import re
 import sqlite3
 import json
+from psutil import pid_exists
 
 RNG = np.random.RandomState(0)
 
@@ -119,7 +120,15 @@ class AudioDataset(Controller):
         # Stop recording.
         if self.recorder_pid is not None:
             with open(devnull, "w+") as f:
-                call(['taskkill', '/F', '/T', '/PID', str(self.recorder_pid)], stderr=f, stdout=f)
+                call(['fmedia', '--globcmd=quit'], stderr=f, stdout=f)
+            self.recorder_pid = None
+
+    def is_recording(self) -> bool:
+        """
+        :return: True if the fmedia recording process still exists.
+        """
+
+        return self.recorder_pid is not None and pid_exists(self.recorder_pid)
 
     def sound20k(self, total: int = 28602) -> None:
         """
@@ -331,13 +340,14 @@ class AudioDataset(Controller):
             self.recorder_pid = Popen(["fmedia",
                                        "--record",
                                        f"--dev-capture={self.capture_device}",
-                                       "--until=10",
-                                       f"--out={str(output_path.resolve())}"],
+                                       "--until=00:20",
+                                       f"--out={str(output_path.resolve())}",
+                                       "--globcmd=listen"],
                                       stderr=f).pid
 
         # Loop until all objects are sleeping.
         done = False
-        while not done:
+        while not done and self.is_recording():
             commands = []
             collisions, environment_collisions, rigidbodies = PyImpact.get_collisions(resp)
             # Create impact sounds from object-object collisions.
@@ -402,7 +412,7 @@ class AudioDataset(Controller):
                                   "frequency": "always"}])
         # Wait for the audio to finish.
         done = False
-        while not done:
+        while not done and self.is_recording():
             done = True
             for r in resp[:-1]:
                 if OutputData.get_data_type_id(r) == "audi":
