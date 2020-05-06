@@ -9,6 +9,7 @@ from tdw_scene_audio import TDWSceneAudio, Realistic, Unrealistic, Chaos
 from tdw_scene_size import TDWSceneSize, StandardSize, SmallSize, RandomSize
 from weighted_collection import WeightedCollection
 from numpy.random import RandomState
+import numpy as np
 
 
 class Scene(ABC):
@@ -118,6 +119,13 @@ class Scene(ABC):
         """
 
         raise Exception()
+
+    def get_scene_index_offset(self) -> int:
+        """
+        :return: The scene index offset (used in the database).
+        """
+
+        return 0
 
 
 class _ProcGenRoom(Scene, ABC):
@@ -394,14 +402,25 @@ class TDWScene(Scene):
 
     def __init__(self):
         self._reverb = TDWScene._REVERB_PARAMETERS.get()
+        self._scene_index_offset = 1000000
+
+    def get_scene_index_offset(self) -> int:
+        return self._scene_index_offset
 
     def _initialize_scene(self, c: Controller) -> List[dict]:
+        self._reverb = TDWScene._REVERB_PARAMETERS.get()
+        self._scene_index_offset = self._reverb.audio_id
         # Get a weighted-random room size.
         width, length = TDWScene._ROOM_SIZES.get().get_size()
         return [{"$type": "load_scene"},
                 TDWUtils.create_empty_room(width, length),
                 {"$type": "destroy_all_objects"},
-                self._reverb.get_command()]
+                self._reverb.get_command(),
+                {"$type": "create_avatar",
+                 "type": "A_Img_Caps_Kinematic",
+                 "id": "a"},
+                {"$type": "add_environ_audio_sensor"},
+                {"$type": "toggle_image_sensor"}]
 
     def get_surface_material(self) -> AudioMaterial:
         return self._reverb.get_audio_material()
@@ -416,6 +435,28 @@ class TDWScene(Scene):
         return 3.5
 
 
+class Marbles(TDWScene):
+    """
+    A scene with some marbles on the floor.
+    """
+
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super()._initialize_scene(c)
+        self._scene_index_offset += 1024
+        r = 0.6
+        # Get all points within the circle defined by the radius.
+        p0 = np.array((0, 0))
+        for x in np.arange(-r, r, 0.2):
+            for z in np.arange(-r, r, 0.2):
+                p1 = np.array((x, z))
+                dist = np.linalg.norm(p0 - p1)
+                if dist < r:
+                    commands.extend(self._init_object(c, name="marble",
+                                                      pos={"x": x, "y": 0, "z": z},
+                                                      rot=TDWUtils.VECTOR3_ZERO))
+        return commands
+
+
 def get_sound20k_scenes() -> List[Scene]:
     """
     :return: A list of scenes, based on their frequency in the original Sound20K dataset.
@@ -424,3 +465,14 @@ def get_sound20k_scenes() -> List[Scene]:
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
             DeskAndChair(), DiningTableAndChairs()]
 
+
+def get_tdw_scenes() -> List[Scene]:
+    """
+    :return: A list of TDW scene types.
+    """
+
+    tdw_scenes = [TDWScene(), Marbles()]
+    scenes = get_sound20k_scenes()[:]
+    for i in range(3):
+        scenes.extend(tdw_scenes[:])
+    return scenes

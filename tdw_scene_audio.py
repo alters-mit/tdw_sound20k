@@ -9,16 +9,16 @@ class SurfaceMaterial(Enum):
     Resonance Audio surface materials.
     """
 
-    smoothPlaster = 0
-    roughPlaster = 1
-    glass = 2
-    parquet = 3
-    marble = 4
-    grass = 5
-    concrete = 6
-    brick = 7
-    tile = 8
-    acousticTile = 9
+    smoothPlaster = 1
+    roughPlaster = 2
+    glass = 4
+    parquet = 8
+    marble = 16
+    grass = 32
+    concrete = 64
+    brick = 128
+    tile = 256
+    acousticTile = 512
 
 
 class _ReverbSpaceParameters:
@@ -56,6 +56,9 @@ class TDWSceneAudio(ABC):
 
     RNG = RandomState(0)
 
+    def __init__(self):
+        self.audio_id = -1
+
     @abstractmethod
     def _get_reverb_space_parameters(self) -> _ReverbSpaceParameters:
         """
@@ -78,6 +81,8 @@ class TDWSceneAudio(ABC):
         """
 
         parameters = self._get_reverb_space_parameters()
+        self.audio_id = parameters.floor + parameters.ceiling + parameters.front_wall + parameters.back_wall + \
+                        parameters.left_wall + parameters.right_wall
         return {"$type": "set_reverb_space_simple",
                 "env_id": 0,
                 "reverb_floor_material": parameters.floor.name,
