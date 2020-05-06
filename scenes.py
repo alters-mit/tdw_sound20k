@@ -5,6 +5,10 @@ from tdw.py_impact import PyImpact, AudioMaterial
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
+from tdw_scene_audio import TDWSceneAudio, Realistic, Unrealistic, Chaos
+from tdw_scene_size import TDWSceneSize, StandardSize, SmallSize, RandomSize
+from weighted_collection import WeightedCollection
+from numpy.random import RandomState
 
 
 class Scene(ABC):
@@ -369,6 +373,49 @@ class DeskAndChair(FloorSound20k):
         return commands
 
 
+class TDWScene(Scene):
+    """
+    A "TDW" scene has randomized room sizes and ResonanceAudio surface materials.
+    These parameters are all chosen "weighted-randomly"; most of the time they will be "plausible",
+    but sometimes they will be "chaotic".
+    """
+
+    # Tend towards "plausible" reverb spaces; note that none of them will ever be Sound20K
+    _REVERB_PARAMETERS = WeightedCollection(TDWSceneAudio)
+    _REVERB_PARAMETERS.add_many({Chaos: 1,
+                                 Unrealistic: 3,
+                                 Realistic: 6})
+
+    _ROOM_SIZES = WeightedCollection(TDWSceneSize)
+    _ROOM_SIZES.add_many({StandardSize: 5,
+                          SmallSize: 3,
+                          RandomSize: 2})
+    _RNG = RandomState(0)
+
+    def __init__(self):
+        self._reverb = TDWScene._REVERB_PARAMETERS.get()
+
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        # Get a weighted-random room size.
+        width, length = TDWScene._ROOM_SIZES.get().get_size()
+        return [{"$type": "load_scene"},
+                TDWUtils.create_empty_room(width, length),
+                {"$type": "destroy_all_objects"},
+                self._reverb.get_command()]
+
+    def get_surface_material(self) -> AudioMaterial:
+        return self._reverb.get_audio_material()
+
+    def get_center(self, c: Controller) -> Dict[str, float]:
+        # Slightly randomize the center.
+        return {"x": TDWScene._RNG.uniform(-0.075, 0.075),
+                "y": 0,
+                "z": TDWScene._RNG.uniform(-0.075, 0.075)}
+
+    def get_max_y(self) -> float:
+        return 3.5
+
+
 def get_sound20k_scenes() -> List[Scene]:
     """
     :return: A list of scenes, based on their frequency in the original Sound20K dataset.
@@ -376,3 +423,4 @@ def get_sound20k_scenes() -> List[Scene]:
 
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
             DeskAndChair(), DiningTableAndChairs()]
+
