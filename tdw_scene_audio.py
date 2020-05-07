@@ -56,9 +56,6 @@ class TDWSceneAudio(ABC):
 
     RNG = RandomState(0)
 
-    def __init__(self):
-        self.audio_id = -1
-
     @abstractmethod
     def _get_reverb_space_parameters(self) -> _ReverbSpaceParameters:
         """
@@ -81,8 +78,6 @@ class TDWSceneAudio(ABC):
         """
 
         parameters = self._get_reverb_space_parameters()
-        self.audio_id = parameters.floor + parameters.ceiling + parameters.front_wall + parameters.back_wall + \
-                        parameters.left_wall + parameters.right_wall
         return {"$type": "set_reverb_space_simple",
                 "env_id": 0,
                 "reverb_floor_material": parameters.floor.name,

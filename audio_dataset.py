@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
 from platform import system
-from scenes import get_sound20k_scenes, Scene
+from scenes import get_sound20k_scenes, get_tdw_scenes, Scene
 from subprocess import Popen, call, check_output
 from json import loads
 from distutils import dir_util
@@ -22,13 +22,16 @@ RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    def __init__(self, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
+    def __init__(self, output_dir: Path = Path("D:/audio_dataset"), total: int = 28602, port: int = 1071):
         """
         :param output_dir: The output directory for the files.
         :param port: The socket port.
+        :param total: The total number of files per sub-set.
         """
 
         assert system() == "Windows", "This controller only works in Windows."
+
+        self.total = total
 
         self.output_dir = output_dir
         if not self.output_dir.exists():
@@ -73,25 +76,6 @@ class AudioDataset(Controller):
         assert dev_search is not None, "No suitable audio capture device found:\n" + devices
         self.capture_device = dev_search.group(1)
 
-        self.sound20k_init_commands = [{"$type": "load_scene"},
-                                       TDWUtils.create_empty_room(12, 12),
-                                       {"$type": "set_proc_gen_walls_scale",
-                                        "walls": TDWUtils.get_box(12, 12),
-                                        "scale": {"x": 1, "y": 4, "z": 1}},
-                                       {"$type": "set_reverb_space_simple",
-                                        "env_id": 0,
-                                        "reverb_floor_material": "parquet",
-                                        "reverb_ceiling_material": "acousticTile",
-                                        "reverb_front_wall_material": "smoothPlaster",
-                                        "reverb_back_wall_material": "smoothPlaster",
-                                        "reverb_left_wall_material": "smoothPlaster",
-                                        "reverb_right_wall_material": "smoothPlaster"},
-                                       {"$type": "create_avatar",
-                                        "type": "A_Img_Caps_Kinematic",
-                                        "id": "a"},
-                                       {"$type": "add_environ_audio_sensor"},
-                                       {"$type": "toggle_image_sensor"}]
-
         super().__init__(port=port)
 
         # Global settings.
@@ -130,28 +114,59 @@ class AudioDataset(Controller):
 
         return self.recorder_pid is not None and pid_exists(self.recorder_pid)
 
-    def sound20k(self, total: int = 28602) -> None:
+    def process_sub_set(self, name: str, wnids_file: str, init_commands: List[dict], scenes: List[Scene]) -> None:
         """
-        Generate a dataset analogous to Sound20K.
+        Process a sub-set of the complete dataset (e.g. all of Sound20K).
 
-        :param total: The total number of audio files to create.
+        :param name: The name of the sub-set.
+        :param wnids_file: The wnids data filename.
+        :param init_commands: The commands used to initialize the entire process (this is sent only once).
+        :param scenes: The scenes that can be loaded.
         """
 
+        print(name)
         # Load models by wnid.
-        wnids = loads(Path("models/wnids_sound20k.json").read_text(encoding="utf-8"))
-        num_per_wnid = int(total / len(wnids))
+        wnids = loads(Path(f"models/{wnids_file}.json").read_text(encoding="utf-8"))
+        num_per_wnid = int(self.total / len(wnids))
 
         # Load the scene.
-        self.communicate(self.sound20k_init_commands)
+        self.communicate(init_commands)
 
-        scenes = get_sound20k_scenes()
-        pbar = tqdm(total=total)
+        pbar = tqdm(total=self.total)
 
         for wnid in wnids:
             pbar.set_description(wnid)
             self.process_wnid(scenes, wnids[wnid], num_per_wnid, pbar)
-        self.communicate({"$type": "terminate"})
         pbar.close()
+
+    def sound20k_set(self) -> None:
+        """
+        Generate a dataset analogous to Sound20K.
+        """
+
+        sound20k_init_commands = [{"$type": "load_scene"},
+                                  TDWUtils.create_empty_room(12, 12),
+                                  {"$type": "set_proc_gen_walls_scale",
+                                   "walls": TDWUtils.get_box(12, 12),
+                                   "scale": {"x": 1, "y": 4, "z": 1}},
+                                  {"$type": "set_reverb_space_simple",
+                                   "env_id": 0,
+                                   "reverb_floor_material": "parquet",
+                                   "reverb_ceiling_material": "acousticTile",
+                                   "reverb_front_wall_material": "smoothPlaster",
+                                   "reverb_back_wall_material": "smoothPlaster",
+                                   "reverb_left_wall_material": "smoothPlaster",
+                                   "reverb_right_wall_material": "smoothPlaster"},
+                                  {"$type": "create_avatar",
+                                   "type": "A_Img_Caps_Kinematic",
+                                   "id": "a"},
+                                  {"$type": "add_environ_audio_sensor"},
+                                  {"$type": "toggle_image_sensor"}]
+
+        self.process_sub_set("Sound20K", "wnids_sound20k", sound20k_init_commands, get_sound20k_scenes())
+
+    def tdw_set(self) -> None:
+        self.process_sub_set("TDW", "wnids_tdw", [], get_tdw_scenes())
 
     def process_wnid(self, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
         """
@@ -531,4 +546,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     a = AudioDataset(output_dir=Path(args.dir))
-    a.sound20k()
+    a.sound20k_set()
+    a.tdw_set()
+    a.communicate({"$type": "terminate"})

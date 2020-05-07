@@ -404,24 +404,24 @@ class TDWScene(Scene):
     """
 
     # Tend towards "plausible" reverb spaces; note that none of them will ever be Sound20K
-    _REVERB_PARAMETERS = WeightedCollection(TDWSceneAudio)
+    _REVERB_PARAMETERS = WeightedCollection()
     _REVERB_PARAMETERS.add_many({Chaos: 1,
                                  Unrealistic: 3,
                                  Realistic: 6})
 
-    _ROOM_SIZES = WeightedCollection(TDWSceneSize)
+    _ROOM_SIZES = WeightedCollection()
     _ROOM_SIZES.add_many({StandardSize: 5,
                           SmallSize: 3,
                           RandomSize: 2})
     _RNG = RandomState(0)
 
     def __init__(self):
-        self._room_size = TDWScene._ROOM_SIZES.get().get_size()
-        self._reverb = TDWScene._REVERB_PARAMETERS.get().get_command()
+        self._room_size: TDWSceneSize = TDWScene._ROOM_SIZES.get()().get_size()
+        self._reverb: TDWSceneAudio = TDWScene._REVERB_PARAMETERS.get()().get_command()
 
     def _get_name(self) -> str:
-        self._room_size = TDWScene._ROOM_SIZES.get().get_size()
-        self._reverb = TDWScene._REVERB_PARAMETERS.get().get_command()
+        self._room_size = TDWScene._ROOM_SIZES.get()().get_size()
+        self._reverb = TDWScene._REVERB_PARAMETERS.get()().get_command()
         return json.dumps(self._reverb) + "_" + str(self._room_size)
 
     def _initialize_scene(self, c: Controller) -> List[dict]:
@@ -438,6 +438,39 @@ class TDWScene(Scene):
     def get_surface_material(self) -> AudioMaterial:
         return self._reverb.get_audio_material()
 
+    def get_center(self, c: Controller) -> Dict[str, float]:
+        # Slightly randomize the center.
+        return {"x": TDWScene._RNG.uniform(-0.075, 0.075),
+                "y": 0,
+                "z": TDWScene._RNG.uniform(-0.075, 0.075)}
+
+    def get_max_y(self) -> float:
+        return 3.5
+
+
+class Marbles(TDWScene):
+    """
+    A scene with some marbles on the floor.
+    """
+
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        commands = super()._initialize_scene(c)
+        r = 0.6
+        # Get all points within the circle defined by the radius.
+        p0 = np.array((0, 0))
+        for x in np.arange(-r, r, 0.25):
+            for z in np.arange(-r, r, 0.25):
+                p1 = np.array((x, z))
+                dist = np.linalg.norm(p0 - p1)
+                if dist < r:
+                    commands.extend(self._init_object(c, name="marble",
+                                                      pos={"x": x, "y": 0, "z": z},
+                                                      rot=TDWUtils.VECTOR3_ZERO))
+        return commands
+
+    def _get_name(self) -> str:
+        return super()._get_name() + "_marbles"
+
 
 def get_sound20k_scenes() -> List[Scene]:
     """
@@ -446,3 +479,7 @@ def get_sound20k_scenes() -> List[Scene]:
 
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
             DeskAndChair(), DiningTableAndChairs()]
+
+
+def get_tdw_scenes() -> List[Scene]:
+    return [TDWScene(), Marbles()]
