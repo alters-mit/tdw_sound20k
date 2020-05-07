@@ -198,18 +198,16 @@ class AudioDataset(Controller):
         scene_index = 0
 
         while count < num_total:
-            # TODO Get the unique identifier for this scene.
-
             output_path, record = self._get_output_path(obj_name=models[model_index]["name"],
                                                         obj_library=models[model_index]["library"],
                                                         file_count=model_count)
+            scenes[scene_index].set_parameters()
             # Do a trial if the file doesn't exist yet.
             if not output_path.exists():
                 try:
                     self.trial(scene=scenes[scene_index],
                                record=record,
-                               output_path=output_path,
-                               scene_index=s_id)
+                               output_path=output_path)
                 finally:
                     # Stop recording audio.
                     self.stop_recording()
@@ -219,11 +217,12 @@ class AudioDataset(Controller):
             scene_count += 1
             if scene_count > num_scenes_per_model:
                 # Add the scene to the database.
-                scene_db = self.db_c.execute("SELECT * FROM scenes WHERE id=?", (scene_index,)).fetchone()
+                scene_db = self.db_c.execute("SELECT * FROM scenes WHERE id=?",
+                                             (scenes[scene_index].get_scene_id(),)).fetchone()
                 if scene_db is None:
-                    self.db_c.execute("INSERT INTO scenes VALUES(?,?)",
-                                      (scene_index, json.dumps(self.sound20k_init_commands[:] +
-                                                           scenes[scene_index].initialize_scene(self))))
+                    self.db_c.execute("INSERT INTO scenes VALUES(?,?)", (scenes[scene_index].get_scene_id(),
+                                                                         json.dumps(scenes[scene_index].
+                                                                                    initialize_scene(self))))
                     self.conn.commit()
                 scene_index += 1
                 scene_count = 0
@@ -244,14 +243,13 @@ class AudioDataset(Controller):
             if pbar is not None:
                 pbar.update(1)
 
-    def trial(self, scene: Scene, record: ModelRecord, output_path: Path, scene_index: int) -> None:
+    def trial(self, scene: Scene, record: ModelRecord, output_path: Path) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
         :param record: The model's metadata record.
         :param output_path: Write the .wav file to this path.
-        :param scene_index: The scene identifier.
         """
 
         self.py_impact.reset(initial_amp=0.05)
@@ -456,7 +454,7 @@ class AudioDataset(Controller):
 
         # Insert the trial's values into the database.
         self.db_c.execute("INSERT INTO sound20k VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                          (str(output_path.resolve()), scene_index, a_x, a_y, a_z, o_x, o_y, o_z, mass,
+                          (str(output_path.resolve()), scene.get_scene_id(), a_x, a_y, a_z, o_x, o_y, o_z, mass,
                            static_friction, dynamic_friction, yaw, pitch, roll, force))
         self.conn.commit()
 
