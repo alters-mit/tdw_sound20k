@@ -417,11 +417,15 @@ class TDWScene(Scene):
 
     def __init__(self):
         self._room_size: TDWSceneSize = TDWScene._ROOM_SIZES.get()().get_size()
-        self._reverb: TDWSceneAudio = TDWScene._REVERB_PARAMETERS.get()().get_command()
+        rp: TDWSceneAudio = TDWScene._REVERB_PARAMETERS.get()()
+        self._audio_material = rp.get_audio_material()
+        self._reverb: dict = rp.get_command()
 
     def _get_name(self) -> str:
         self._room_size = TDWScene._ROOM_SIZES.get()().get_size()
-        self._reverb = TDWScene._REVERB_PARAMETERS.get()().get_command()
+        rp: TDWSceneAudio = TDWScene._REVERB_PARAMETERS.get()()
+        self._audio_material = rp.get_audio_material()
+        self._reverb: dict = rp.get_command()
         return json.dumps(self._reverb) + "_" + str(self._room_size)
 
     def _initialize_scene(self, c: Controller) -> List[dict]:
@@ -436,7 +440,7 @@ class TDWScene(Scene):
                 {"$type": "toggle_image_sensor"}]
 
     def get_surface_material(self) -> AudioMaterial:
-        return self._reverb.get_audio_material()
+        return self._audio_material
 
     def get_center(self, c: Controller) -> Dict[str, float]:
         # Slightly randomize the center.

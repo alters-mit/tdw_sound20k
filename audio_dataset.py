@@ -136,7 +136,7 @@ class AudioDataset(Controller):
 
         for wnid in wnids:
             pbar.set_description(wnid)
-            self.process_wnid(scenes, wnids[wnid], num_per_wnid, pbar)
+            self.process_wnid(self.output_dir.joinpath(name), scenes, wnids[wnid], num_per_wnid, pbar)
         pbar.close()
 
     def sound20k_set(self) -> None:
@@ -168,10 +168,11 @@ class AudioDataset(Controller):
     def tdw_set(self) -> None:
         self.process_sub_set("TDW", "wnids_tdw", [], get_tdw_scenes())
 
-    def process_wnid(self, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
+    def process_wnid(self, root_dir: Path, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
         """
         Generate .wav files from all models in the category.
 
+        :param root_dir: The root output directory.
         :param scenes: The scenes that a trial can use.
         :param models: The names of the models in the category and their libraries.
         :param num_total: The total number of files to generate for this category.
@@ -195,7 +196,8 @@ class AudioDataset(Controller):
         while count < num_total:
             output_path, record = self._get_output_path(obj_name=models[model_index]["name"],
                                                         obj_library=models[model_index]["library"],
-                                                        file_count=model_count)
+                                                        file_count=model_count,
+                                                        root_dir=root_dir)
             # Do a trial if the file doesn't exist yet.
             if not output_path.exists():
                 try:
@@ -355,7 +357,7 @@ class AudioDataset(Controller):
             self.recorder_pid = Popen(["fmedia",
                                        "--record",
                                        f"--dev-capture={self.capture_device}",
-                                       "--until=00:20",
+                                       "--until=00:10",
                                        f"--out={str(output_path.resolve())}",
                                        "--globcmd=listen"],
                                       stderr=f).pid
@@ -449,7 +451,7 @@ class AudioDataset(Controller):
 
         # Insert the trial's values into the database.
         self.db_c.execute("INSERT INTO sound20k VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                          (str(output_path.resolve()), scene_index, a_x, a_y, a_z, o_x, o_y, o_z, mass,
+                          (output_path.name, scene_index, a_x, a_y, a_z, o_x, o_y, o_z, mass,
                            static_friction, dynamic_friction, yaw, pitch, roll, force))
         self.conn.commit()
 
@@ -467,18 +469,19 @@ class AudioDataset(Controller):
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
 
-    def _get_output_path(self, obj_name: str, obj_library: str, file_count: int) -> Tuple[Path, ModelRecord]:
+    def _get_output_path(self, root_dir: Path, obj_name: str, obj_library: str, file_count: int) -> Tuple[Path, ModelRecord]:
         """
         :param obj_name: The model name.
         :param obj_library: The model record's metadata library.
         :param file_count: The number of files with this model so far.
+        :param root_dir: The root output directory.
 
         :return: The path to the next file to be written.
         """
 
         record = self.libs[obj_library].get_record(obj_name)
 
-        output_dir = self.output_dir.joinpath(record.wnid)
+        output_dir = root_dir.joinpath(record.wnid)
         if not output_dir.exists():
             output_dir.mkdir(parents=True)
 
