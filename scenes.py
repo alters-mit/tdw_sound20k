@@ -448,33 +448,61 @@ class TDWScene(Scene):
         return 3.5
 
 
-class Marbles(TDWScene):
+class TDWObjects(TDWScene):
     """
-    A scene with some marbles on the floor.
+    A scene with random "base objects" (large objects to drop an object on) and "prop objects" (just some clutter).
     """
+
+    _BASE_OBJS: List[str] = []
+    _PROP_OBJS: List[str] = []
+    for obj in Scene._OBJECT_INFO:
+        mass = Scene._OBJECT_INFO[obj].mass
+        if mass > 25:
+            _BASE_OBJS.append(obj)
+        elif mass <= 5:
+            _PROP_OBJS.append(obj)
+
+    def __init__(self):
+        super().__init__()
+        self._base_obj: str = ""
+        self._prop_objs: List[str] = []
+        self._get_name()
+
+    def _get_name(self) -> str:
+        # Get the base object.
+        self._base_obj = TDWObjects._BASE_OBJS[TDWScene._RNG.randint(0, len(TDWObjects._BASE_OBJS))]
+        # Get a few prop objects.
+        for i in range(TDWScene._RNG.randint(0, 4)):
+            self._prop_objs.append(TDWObjects._PROP_OBJS[TDWScene._RNG.randint(0, len(TDWObjects._PROP_OBJS))])
+        return super()._get_name() + "_" + self._base_obj + "_" + str(self._prop_objs)
 
     def _initialize_scene(self, c: Controller) -> List[dict]:
         commands = super()._initialize_scene(c)
-        r = 0.6
-        # Get all points within the circle defined by the radius.
-        p0 = np.array((0, 0))
-        for x in np.arange(-r, r, 0.25):
-            for z in np.arange(-r, r, 0.25):
-                p1 = np.array((x, z))
-                dist = np.linalg.norm(p0 - p1)
-                if dist < r:
-                    commands.extend(self._init_object(c, name="marble",
-                                                      pos={"x": x, "y": 0, "z": z},
-                                                      rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, name=self._base_obj,
+                                          pos={"x": TDWScene._RNG.uniform(-0.05, 0.05),
+                                               "y": 0,
+                                               "z": TDWScene._RNG.uniform(-0.05, 0.05)},
+                                          rot={"x": 0, "y": TDWScene._RNG.uniform(-60, 60), "z": 0}))
+        r = 0.5
+        points = []
+        for x in np.arange(-r, r, 0.1):
+            for z in np.arange(-r, r, 0.1):
+                p1 = (x, z)
+                points.append(p1)
+        TDWScene._RNG.shuffle(points)
+        for prop_obj, point in zip(self._prop_objs, points):
+            commands.extend(self._init_object(c, name=prop_obj,
+                                              pos={"x": point[0], "y": 1, "z": point[1]},
+                                              rot={"x": 0, "y": TDWScene._RNG.uniform(-60, 60), "z": 0}))
+        # Let everything settle.
+        commands.append({"$type": "step_physics",
+                         "frames": 200})
         return commands
-
-    def _get_name(self) -> str:
-        return super()._get_name() + "_marbles"
 
 
 def get_sound20k_scenes() -> List[Scene]:
     """
-    :return: A list of scenes, based on their frequency in the original Sound20K dataset.
+    :return: A list of scenes that the "Sound20K" set can use.
     """
 
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
@@ -482,4 +510,9 @@ def get_sound20k_scenes() -> List[Scene]:
 
 
 def get_tdw_scenes() -> List[Scene]:
-    return [TDWScene(), Marbles()]
+    """
+    :return: A list of scenes that the "TDW" set can use.
+    """
+    
+    return [TDWScene(), TDWObjects()]
+
