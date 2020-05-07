@@ -4,12 +4,13 @@ from tdw.librarian import ModelLibrarian
 from tdw.py_impact import PyImpact, AudioMaterial
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
-from pathlib import Path
 from tdw_scene_audio import TDWSceneAudio, Realistic, Unrealistic, Chaos
 from tdw_scene_size import TDWSceneSize, StandardSize, SmallSize, RandomSize
 from weighted_collection import WeightedCollection
 from numpy.random import RandomState
 import numpy as np
+from pathlib import Path
+import json
 
 
 class Scene(ABC):
@@ -26,13 +27,8 @@ class Scene(ABC):
     _custom_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
     for obj in _custom_object_info:
         _OBJECT_INFO.update({obj: _custom_object_info[obj]})
-
-    def set_parameters(self) -> None:
-        """
-        Set the scene parameters f or the next trial.
-        """
-
-        return
+    _SCENE_IDS: Dict[str, int] = {}
+    _SCENE_INDEX = 0
 
     def initialize_scene(self, c: Controller) -> List[dict]:
         """
@@ -83,14 +79,6 @@ class Scene(ABC):
 
         raise Exception()
 
-    @abstractmethod
-    def get_scene_id(self) -> int:
-        """
-        :return: The unique identifier of this scene type.
-        """
-
-        raise Exception()
-
     @staticmethod
     def _init_object(c: Controller, name: str, pos: Dict[str, float], rot: Dict[str, float]) -> List[dict]:
         """
@@ -135,6 +123,25 @@ class Scene(ABC):
 
         raise Exception()
 
+    def _get_name(self) -> str:
+        """
+        :return: The name of this scene; used for indexing.
+        """
+
+        return type(self).__name__
+
+    def get_id(self) -> int:
+        """
+        :return: The unique ID of this type of scene.
+        """
+
+        name = self._get_name()
+        # Index the name.
+        if name not in Scene._SCENE_IDS:
+            Scene._SCENE_IDS.update({name: Scene._SCENE_INDEX})
+            Scene._SCENE_INDEX += 1
+        return Scene._SCENE_IDS[name]
+
 
 class _ProcGenRoom(Scene, ABC):
     """
@@ -159,9 +166,6 @@ class FloorSound20k(_ProcGenRoom):
     def get_center(self, c: Controller) -> Dict[str, float]:
         return {"x": 0, "y": 0, "z": 0}
 
-    def get_scene_id(self) -> int:
-        return 0
-
 
 class CornerSound20k(_ProcGenRoom):
     """
@@ -175,9 +179,6 @@ class CornerSound20k(_ProcGenRoom):
     @staticmethod
     def get_camera_angles() -> Tuple[float, float]:
         return 120, 250
-
-    def get_scene_id(self) -> int:
-        return 1
 
 
 class _FloorWithObject(FloorSound20k):
@@ -218,6 +219,42 @@ class _FloorWithObject(FloorSound20k):
         return commands
 
 
+class LargeBowl(_FloorWithObject):
+    """
+    A large ceramic bowl.
+    """
+
+    def _get_model_name(self) -> str:
+        return "int_kitchen_accessories_le_creuset_bowl_30cm"
+
+    def _get_library(self) -> str:
+        return Scene._MODEL_LIBRARY_PATH
+
+
+class Ramp(_FloorWithObject):
+    """
+    A simple ramp.
+    """
+
+    def _get_model_name(self) -> str:
+        return "ramp_with_platform"
+
+    def _get_library(self) -> str:
+        return "models_special.json"
+
+
+class RoundTable(_FloorWithObject):
+    """
+    A large round wooden table.
+    """
+
+    def _get_model_name(self) -> str:
+        return "enzo_industrial_loft_pine_metal_round_dining_table"
+
+    def _get_library(self) -> str:
+        return "models_full.json"
+
+
 class StairRamp(_FloorWithObject):
     """
     A simple staircase.
@@ -235,24 +272,6 @@ class StairRamp(_FloorWithObject):
                          "id": list(Scene.OBJECT_IDS.keys())[0],
                          "position": {"x": 0, "y": 0, "z": -0.3}})
         return commands
-
-    def get_scene_id(self) -> int:
-        return 2
-
-
-class RoundTable(_FloorWithObject):
-    """
-    A large round wooden table.
-    """
-
-    def _get_model_name(self) -> str:
-        return "enzo_industrial_loft_pine_metal_round_dining_table"
-
-    def _get_library(self) -> str:
-        return "models_full.json"
-
-    def get_scene_id(self) -> int:
-        return 3
 
 
 class UnevenTerrain(_FloorWithObject):
@@ -272,93 +291,6 @@ class UnevenTerrain(_FloorWithObject):
         commands.append({"$type": "step_physics",
                          "frames": 3})
         return commands
-
-    def get_scene_id(self) -> int:
-        return 4
-
-
-class LargeBowl(_FloorWithObject):
-    """
-    A large ceramic bowl.
-    """
-
-    def _get_model_name(self) -> str:
-        return "int_kitchen_accessories_le_creuset_bowl_30cm"
-
-    def _get_library(self) -> str:
-        return Scene._MODEL_LIBRARY_PATH
-
-    def get_scene_id(self) -> int:
-        return 5
-
-
-class Ramp(_FloorWithObject):
-    """
-    A simple ramp.
-    """
-
-    def _get_model_name(self) -> str:
-        return "ramp_with_platform"
-
-    def _get_library(self) -> str:
-        return "models_special.json"
-
-    def get_scene_id(self) -> int:
-        return 6
-
-
-class DeskAndChair(FloorSound20k):
-    """
-    A desk, a chair, and a shelf with some boxes, facing a wall.
-    """
-
-    def get_center(self, c: Controller) -> Dict[str, float]:
-        return {"x": 0, "y": 0, "z": 3.8}
-
-    @staticmethod
-    def get_camera_angles() -> Tuple[float, float]:
-        return 270, 300
-
-    def _initialize_scene(self, c: Controller) -> List[dict]:
-        c.model_librarian = ModelLibrarian("models_full.json")
-        commands = super()._initialize_scene(c)
-
-        # Add a table, chair, and boxes.
-        commands.extend(self._init_object(c, "b05_table_new",
-                                          pos={"x": 0, "y": 0, "z": 4.33},
-                                          rot=TDWUtils.VECTOR3_ZERO))
-        commands.extend(self._init_object(c, "chair_willisau_riale",
-                                          pos={"x": 0, "y": 0, "z": 3.7},
-                                          rot=TDWUtils.VECTOR3_ZERO))
-        commands.extend(self._init_object(c, "iron_box",
-                                          pos={"x": 0.13, "y": 0.65, "z": 4.83},
-                                          rot=TDWUtils.VECTOR3_ZERO))
-        commands.extend(self._init_object(c, "iron_box",
-                                          pos={"x": -0.285, "y": 1.342, "z": 4.79},
-                                          rot={"x": 90, "y": 0, "z": 0}))
-        # Add a shelf with a custom scale.
-        shelf_id = c.get_unique_id()
-        shelf_name = "metal_lab_shelf"
-        Scene.OBJECT_IDS.update({shelf_id: shelf_name})
-        commands.extend([c.get_add_object(shelf_name,
-                         object_id=shelf_id,
-                         rotation={"x": 0, "y": -90, "z": 0},
-                         position={"x": 0, "y": 0, "z": 4.93}),
-                         {"$type": "set_mass",
-                          "id": shelf_id,
-                          "mass": 400},
-                         {"$type": "set_physic_material",
-                          "id": shelf_id,
-                          "bounciness": Scene._OBJECT_INFO[shelf_name].bounciness,
-                          "static_friction": 0.1,
-                          "dynamic_friction": 0.8},
-                         {"$type": "scale_object",
-                          "id": shelf_id,
-                          "scale_factor": {"x": 1, "y": 1.5, "z": 1.8}}])
-        return commands
-
-    def get_scene_id(self) -> int:
-        return 7
 
 
 class DiningTableAndChairs(FloorSound20k):
@@ -412,8 +344,56 @@ class DiningTableAndChairs(FloorSound20k):
 
         return commands
 
-    def get_scene_id(self) -> int:
-        return 8
+
+class DeskAndChair(FloorSound20k):
+    """
+    A desk, a chair, and a shelf with some boxes, facing a wall.
+    """
+
+    def get_center(self, c: Controller) -> Dict[str, float]:
+        return {"x": 0, "y": 0, "z": 3.8}
+
+    @staticmethod
+    def get_camera_angles() -> Tuple[float, float]:
+        return 270, 300
+
+    def _initialize_scene(self, c: Controller) -> List[dict]:
+        c.model_librarian = ModelLibrarian("models_full.json")
+        commands = super()._initialize_scene(c)
+
+        # Add a table, chair, and boxes.
+        commands.extend(self._init_object(c, "b05_table_new",
+                                          pos={"x": 0, "y": 0, "z": 4.33},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "chair_willisau_riale",
+                                          pos={"x": 0, "y": 0, "z": 3.7},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "iron_box",
+                                          pos={"x": 0.13, "y": 0.65, "z": 4.83},
+                                          rot=TDWUtils.VECTOR3_ZERO))
+        commands.extend(self._init_object(c, "iron_box",
+                                          pos={"x": -0.285, "y": 1.342, "z": 4.79},
+                                          rot={"x": 90, "y": 0, "z": 0}))
+        # Add a shelf with a custom scale.
+        shelf_id = c.get_unique_id()
+        shelf_name = "metal_lab_shelf"
+        Scene.OBJECT_IDS.update({shelf_id: shelf_name})
+        commands.extend([c.get_add_object(shelf_name,
+                         object_id=shelf_id,
+                         rotation={"x": 0, "y": -90, "z": 0},
+                         position={"x": 0, "y": 0, "z": 4.93}),
+                         {"$type": "set_mass",
+                          "id": shelf_id,
+                          "mass": 400},
+                         {"$type": "set_physic_material",
+                          "id": shelf_id,
+                          "bounciness": Scene._OBJECT_INFO[shelf_name].bounciness,
+                          "static_friction": 0.1,
+                          "dynamic_friction": 0.8},
+                         {"$type": "scale_object",
+                          "id": shelf_id,
+                          "scale_factor": {"x": 1, "y": 1.5, "z": 1.8}}])
+        return commands
 
 
 class TDWScene(Scene):
@@ -435,26 +415,20 @@ class TDWScene(Scene):
                           RandomSize: 2})
     _RNG = RandomState(0)
 
-    _SCENE_INDEX_SHIFT = 8
-
     def __init__(self):
-        self._reverb = TDWScene._REVERB_PARAMETERS.get()
-        self._scene_id = 0
+        self._room_size = TDWScene._ROOM_SIZES.get().get_size()
+        self._reverb = TDWScene._REVERB_PARAMETERS.get().get_command()
 
-    def set_parameters(self) -> None:
-        self._reverb = TDWScene._REVERB_PARAMETERS.get()
-        self._scene_id = self._reverb.audio_id << TDWScene._SCENE_INDEX_SHIFT
-
-    def get_scene_id(self) -> int:
-        return self._scene_id
+    def _get_name(self) -> str:
+        self._room_size = TDWScene._ROOM_SIZES.get().get_size()
+        self._reverb = TDWScene._REVERB_PARAMETERS.get().get_command()
+        return json.dumps(self._reverb) + "_" + str(self._room_size)
 
     def _initialize_scene(self, c: Controller) -> List[dict]:
-        # Get a weighted-random room size.
-        width, length = TDWScene._ROOM_SIZES.get().get_size()
         return [{"$type": "load_scene"},
-                TDWUtils.create_empty_room(width, length),
+                TDWUtils.create_empty_room(self._room_size[0], self._room_size[1]),
                 {"$type": "destroy_all_objects"},
-                self._reverb.get_command(),
+                self._reverb,
                 {"$type": "create_avatar",
                  "type": "A_Img_Caps_Kinematic",
                  "id": "a"},
@@ -464,40 +438,6 @@ class TDWScene(Scene):
     def get_surface_material(self) -> AudioMaterial:
         return self._reverb.get_audio_material()
 
-    def get_center(self, c: Controller) -> Dict[str, float]:
-        # Slightly randomize the center.
-        return {"x": TDWScene._RNG.uniform(-0.075, 0.075),
-                "y": 0,
-                "z": TDWScene._RNG.uniform(-0.075, 0.075)}
-
-    def get_max_y(self) -> float:
-        return 3.5
-
-
-class Marbles(TDWScene):
-    """
-    A scene with some marbles on the floor.
-    """
-
-    def set_parameters(self) -> None:
-        super().set_parameters()
-        self._scene_id += 1024 << TDWScene._SCENE_INDEX_SHIFT
-
-    def _initialize_scene(self, c: Controller) -> List[dict]:
-        commands = super()._initialize_scene(c)
-        r = 0.6
-        # Get all points within the circle defined by the radius.
-        p0 = np.array((0, 0))
-        for x in np.arange(-r, r, 0.2):
-            for z in np.arange(-r, r, 0.2):
-                p1 = np.array((x, z))
-                dist = np.linalg.norm(p0 - p1)
-                if dist < r:
-                    commands.extend(self._init_object(c, name="marble",
-                                                      pos={"x": x, "y": 0, "z": z},
-                                                      rot=TDWUtils.VECTOR3_ZERO))
-        return commands
-
 
 def get_sound20k_scenes() -> List[Scene]:
     """
@@ -506,15 +446,3 @@ def get_sound20k_scenes() -> List[Scene]:
 
     return [FloorSound20k(), CornerSound20k(), StairRamp(), RoundTable(), UnevenTerrain(), LargeBowl(), Ramp(),
             DeskAndChair(), DiningTableAndChairs()]
-
-
-def get_tdw_scenes() -> List[Scene]:
-    """
-    :return: A list of TDW scene types.
-    """
-
-    tdw_scenes = [TDWScene(), Marbles()]
-    scenes = get_sound20k_scenes()[:]
-    for i in range(3):
-        scenes.extend(tdw_scenes[:])
-    return scenes

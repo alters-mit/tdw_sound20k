@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
 from platform import system
-from scenes import get_sound20k_scenes, get_tdw_scenes, Scene
+from scenes import get_sound20k_scenes, Scene
 from subprocess import Popen, call, check_output
 from json import loads
 from distutils import dir_util
@@ -22,16 +22,13 @@ RNG = np.random.RandomState(0)
 
 
 class AudioDataset(Controller):
-    def __init__(self, output_dir: Path = Path("D:/audio_dataset"), total_per_set: int = 28602, port: int = 1071):
+    def __init__(self, output_dir: Path = Path("D:/audio_dataset"), port: int = 1071):
         """
         :param output_dir: The output directory for the files.
-        :param total_per_set: The total number of files per set.
         :param port: The socket port.
         """
 
         assert system() == "Windows", "This controller only works in Windows."
-
-        self.total_per_set = total_per_set
 
         self.output_dir = output_dir
         if not self.output_dir.exists():
@@ -76,6 +73,25 @@ class AudioDataset(Controller):
         assert dev_search is not None, "No suitable audio capture device found:\n" + devices
         self.capture_device = dev_search.group(1)
 
+        self.sound20k_init_commands = [{"$type": "load_scene"},
+                                       TDWUtils.create_empty_room(12, 12),
+                                       {"$type": "set_proc_gen_walls_scale",
+                                        "walls": TDWUtils.get_box(12, 12),
+                                        "scale": {"x": 1, "y": 4, "z": 1}},
+                                       {"$type": "set_reverb_space_simple",
+                                        "env_id": 0,
+                                        "reverb_floor_material": "parquet",
+                                        "reverb_ceiling_material": "acousticTile",
+                                        "reverb_front_wall_material": "smoothPlaster",
+                                        "reverb_back_wall_material": "smoothPlaster",
+                                        "reverb_left_wall_material": "smoothPlaster",
+                                        "reverb_right_wall_material": "smoothPlaster"},
+                                       {"$type": "create_avatar",
+                                        "type": "A_Img_Caps_Kinematic",
+                                        "id": "a"},
+                                       {"$type": "add_environ_audio_sensor"},
+                                       {"$type": "toggle_image_sensor"}]
+
         super().__init__(port=port)
 
         # Global settings.
@@ -114,64 +130,28 @@ class AudioDataset(Controller):
 
         return self.recorder_pid is not None and pid_exists(self.recorder_pid)
 
-    def process_set(self, name: str, wnids_filename: str, init_commands: [], scenes: List[Scene]) -> None:
+    def sound20k(self, total: int = 28602) -> None:
         """
-        Process a set of scenes and objects.
+        Generate a dataset analogous to Sound20K.
 
-        :param name: The name of the scene.
-        :param wnids_filename: The filename of the wnid/object data.
-        :param init_commands: Initialization commands to send once.
-        :param scenes: The scenes.
+        :param total: The total number of audio files to create.
         """
 
-        print(name)
         # Load models by wnid.
-        wnids = loads(Path(f"models/{wnids_filename}.json").read_text(encoding="utf-8"))
-        num_per_wnid = int(self.total_per_set / len(wnids))
+        wnids = loads(Path("models/wnids_sound20k.json").read_text(encoding="utf-8"))
+        num_per_wnid = int(total / len(wnids))
 
         # Load the scene.
-        self.communicate(init_commands)
+        self.communicate(self.sound20k_init_commands)
 
-        pbar = tqdm(total=self.total_per_set)
+        scenes = get_sound20k_scenes()
+        pbar = tqdm(total=total)
 
         for wnid in wnids:
             pbar.set_description(wnid)
             self.process_wnid(scenes, wnids[wnid], num_per_wnid, pbar)
         self.communicate({"$type": "terminate"})
         pbar.close()
-
-    def sound20k_set(self) -> None:
-        """
-        Generate a dataset analogous to Sound20K.
-        """
-
-        commands = [{"$type": "load_scene"},
-                    TDWUtils.create_empty_room(12, 12),
-                    {"$type": "set_proc_gen_walls_scale",
-                     "walls": TDWUtils.get_box(12, 12),
-                     "scale": {"x": 1, "y": 4, "z": 1}},
-                    {"$type": "set_reverb_space_simple",
-                     "env_id": 0,
-                     "reverb_floor_material": "parquet",
-                     "reverb_ceiling_material": "acousticTile",
-                     "reverb_front_wall_material": "smoothPlaster",
-                     "reverb_back_wall_material": "smoothPlaster",
-                     "reverb_left_wall_material": "smoothPlaster",
-                     "reverb_right_wall_material": "smoothPlaster"},
-                    {"$type": "create_avatar",
-                     "type": "A_Img_Caps_Kinematic",
-                     "id": "a"},
-                    {"$type": "add_environ_audio_sensor"},
-                    {"$type": "toggle_image_sensor"}]
-
-        self.process_set("Sound20K", "wnids_sound20k", commands, get_sound20k_scenes())
-
-    def tdw_set(self) -> None:
-        """
-        Generate a dataset using the full power of TDW.
-        """
-
-        self.process_set("TDW", "wnids_tdw", [], get_tdw_scenes())
 
     def process_wnid(self, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
         """
@@ -201,13 +181,13 @@ class AudioDataset(Controller):
             output_path, record = self._get_output_path(obj_name=models[model_index]["name"],
                                                         obj_library=models[model_index]["library"],
                                                         file_count=model_count)
-            scenes[scene_index].set_parameters()
             # Do a trial if the file doesn't exist yet.
             if not output_path.exists():
                 try:
                     self.trial(scene=scenes[scene_index],
                                record=record,
-                               output_path=output_path)
+                               output_path=output_path,
+                               scene_index=scene_index)
                 finally:
                     # Stop recording audio.
                     self.stop_recording()
@@ -216,13 +196,12 @@ class AudioDataset(Controller):
             # Iterate through scenes.
             scene_count += 1
             if scene_count > num_scenes_per_model:
+                scene_id = scenes[scene_index].get_id()
                 # Add the scene to the database.
-                scene_db = self.db_c.execute("SELECT * FROM scenes WHERE id=?",
-                                             (scenes[scene_index].get_scene_id(),)).fetchone()
+                scene_db = self.db_c.execute("SELECT * FROM scenes WHERE id=?", (scene_id,)).fetchone()
                 if scene_db is None:
-                    self.db_c.execute("INSERT INTO scenes VALUES(?,?)", (scenes[scene_index].get_scene_id(),
-                                                                         json.dumps(scenes[scene_index].
-                                                                                    initialize_scene(self))))
+                    self.db_c.execute("INSERT INTO scenes VALUES(?,?)",
+                                      (scene_id, json.dumps(scenes[scene_index].initialize_scene(self))))
                     self.conn.commit()
                 scene_index += 1
                 scene_count = 0
@@ -243,13 +222,14 @@ class AudioDataset(Controller):
             if pbar is not None:
                 pbar.update(1)
 
-    def trial(self, scene: Scene, record: ModelRecord, output_path: Path) -> None:
+    def trial(self, scene: Scene, record: ModelRecord, output_path: Path, scene_index: int) -> None:
         """
         Run a trial in a scene that has been initialized.
 
         :param scene: Data for the current scene.
         :param record: The model's metadata record.
         :param output_path: Write the .wav file to this path.
+        :param scene_index: The scene identifier.
         """
 
         self.py_impact.reset(initial_amp=0.05)
@@ -454,7 +434,7 @@ class AudioDataset(Controller):
 
         # Insert the trial's values into the database.
         self.db_c.execute("INSERT INTO sound20k VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                          (str(output_path.resolve()), scene.get_scene_id(), a_x, a_y, a_z, o_x, o_y, o_z, mass,
+                          (str(output_path.resolve()), scene_index, a_x, a_y, a_z, o_x, o_y, o_z, mass,
                            static_friction, dynamic_friction, yaw, pitch, roll, force))
         self.conn.commit()
 
@@ -551,4 +531,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     a = AudioDataset(output_dir=Path(args.dir))
-    a.sound20k_set()
+    a.sound20k()
