@@ -513,6 +513,5 @@ def get_tdw_scenes() -> List[Scene]:
     """
     :return: A list of scenes that the "TDW" set can use.
     """
-    
-    return [TDWScene(), TDWObjects()]
 
+    return [TDWScene(), TDWObjects()]
