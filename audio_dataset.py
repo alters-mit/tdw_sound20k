@@ -6,7 +6,6 @@ from tdw.librarian import ModelLibrarian, ModelRecord
 import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List
-from platform import system
 from scenes import get_sound20k_scenes, get_tdw_scenes, Scene
 from json import loads
 from distutils import dir_util
@@ -24,8 +23,6 @@ class AudioDataset(Controller):
         :param port: The socket port.
         :param total: The total number of files per sub-set.
         """
-
-        assert system() == "Windows", "This controller only works in Windows."
 
         self.total = total
 

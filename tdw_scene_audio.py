@@ -90,8 +90,7 @@ class TDWSceneAudio(ABC):
 
 class Realistic(TDWSceneAudio):
     """
-    A "realistic" reverb space with random surface materials.
-    All of the surface materials are "plausible" (e.g. walls are never made out of grass).
+    Surface materials are chosen randomly, but are "plausible" (e.g. walls are never made out of grass).
     The walls all have the same surface material.
     """
 
@@ -135,8 +134,8 @@ class Realistic(TDWSceneAudio):
 
 class Unrealistic(Realistic):
     """
-    An "unrealistic" reverb space.
-    All of the surface materials are plausible, but each of the walls can have a different material.
+    Surface materials are chosen randomly, but are "plausible" (e.g. walls are never made out of grass).
+    Each of the walls can have a different material.
     """
 
     def _get_reverb_space_parameters(self) -> _ReverbSpaceParameters:
