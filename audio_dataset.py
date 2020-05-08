@@ -1,5 +1,5 @@
 from tdw.controller import Controller
-from tdw.tdw_utils import TDWUtils
+from tdw.tdw_utils import TDWUtils, AudioUtils
 from tdw.py_impact import PyImpact, AudioMaterial
 from tdw.output_data import OutputData, Bounds, Transforms, Rigidbodies, AudioSources
 from tdw.librarian import ModelLibrarian, ModelRecord
@@ -8,15 +8,11 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional, List
 from platform import system
 from scenes import get_sound20k_scenes, get_tdw_scenes, Scene
-from subprocess import Popen, call, check_output
 from json import loads
 from distutils import dir_util
-from os import devnull
 from tqdm import tqdm
-import re
 import sqlite3
 import json
-from psutil import pid_exists
 
 RNG = np.random.RandomState(0)
 
@@ -53,8 +49,6 @@ class AudioDataset(Controller):
 
         self.py_impact = PyImpact()
 
-        self.recorder_pid: Optional[int] = None
-
         self.object_info = PyImpact.get_object_info()
         sound20k_object_info = PyImpact.get_object_info(Path("models/object_info.csv"))
         for obj_info in sound20k_object_info:
@@ -63,18 +57,12 @@ class AudioDataset(Controller):
             else:
                 self.object_info.update({obj_info: sound20k_object_info[obj_info]})
 
-        lib_full = ModelLibrarian("models_full.json")
-        lib_sound20k = ModelLibrarian(str(Path("models/models.json").resolve()))
-        lib_special = ModelLibrarian("models_special.json")
-        self.libs = {"models_full.json": lib_full,
-                     "models_special.json": lib_special,
-                     "models/models.json": lib_sound20k}
-
-        # Get the correct device to record system audio.
-        devices = check_output(["fmedia", "--list-dev"]).decode("utf-8").split("Capture:")[1]
-        dev_search = re.search("device #(.*): Stereo Mix", devices, flags=re.MULTILINE)
-        assert dev_search is not None, "No suitable audio capture device found:\n" + devices
-        self.capture_device = dev_search.group(1)
+        self.libs: Dict[str, ModelLibrarian] = {}
+        # Load all model libraries into memory.
+        for lib_name in ModelLibrarian.get_library_filenames():
+            self.libs.update({lib_name: ModelLibrarian(lib_name)})
+        # Add the custom model library.
+        self.libs.update({"models/models.json": ModelLibrarian(str(Path("models/models.json").resolve()))})
 
         super().__init__(port=port)
 
@@ -95,24 +83,6 @@ class AudioDataset(Controller):
         """
 
         dir_util.remove_tree(str(self.output_dir.resolve()))
-
-    def stop_recording(self) -> None:
-        """
-        Kill the recording process.
-        """
-
-        # Stop recording.
-        if self.recorder_pid is not None:
-            with open(devnull, "w+") as f:
-                call(['fmedia', '--globcmd=quit'], stderr=f, stdout=f)
-            self.recorder_pid = None
-
-    def is_recording(self) -> bool:
-        """
-        :return: True if the fmedia recording process still exists.
-        """
-
-        return self.recorder_pid is not None and pid_exists(self.recorder_pid)
 
     def process_sub_set(self, name: str, wnids_file: str, init_commands: List[dict], scenes: List[Scene]) -> None:
         """
@@ -207,7 +177,7 @@ class AudioDataset(Controller):
                                scene_index=scene_index)
                 finally:
                     # Stop recording audio.
-                    self.stop_recording()
+                    AudioUtils.stop()
 
             count += 1
             # Iterate through scenes.
@@ -352,19 +322,11 @@ class AudioDataset(Controller):
         # Send the commands.
         resp = self.communicate(commands)
 
-        # Begin audio recording.
-        with open(devnull, "w+") as f:
-            self.recorder_pid = Popen(["fmedia",
-                                       "--record",
-                                       f"--dev-capture={self.capture_device}",
-                                       "--until=00:10",
-                                       f"--out={str(output_path.resolve())}",
-                                       "--globcmd=listen"],
-                                      stderr=f).pid
+        AudioUtils.start(output_path=output_path, until=(0, 10))
 
         # Loop until all objects are sleeping.
         done = False
-        while not done and self.is_recording():
+        while not done and AudioUtils.is_recording():
             commands = []
             collisions, environment_collisions, rigidbodies = PyImpact.get_collisions(resp)
             # Create impact sounds from object-object collisions.
@@ -429,7 +391,7 @@ class AudioDataset(Controller):
                                   "frequency": "always"}])
         # Wait for the audio to finish.
         done = False
-        while not done and self.is_recording():
+        while not done and AudioUtils.is_recording():
             done = True
             for r in resp[:-1]:
                 if OutputData.get_data_type_id(r) == "audi":
