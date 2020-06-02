@@ -166,4 +166,3 @@ class Chaos(TDWSceneAudio):
 
     def get_audio_material(self) -> AudioMaterial:
         return Chaos._PY_IMPACT_MATERIALS[TDWSceneAudio.RNG.randint(0, len(Chaos._PY_IMPACT_MATERIALS))]
-

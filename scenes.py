@@ -5,7 +5,7 @@ from tdw.py_impact import PyImpact, AudioMaterial
 from typing import List, Dict, Tuple
 from abc import ABC, abstractmethod
 from tdw_scene_audio import TDWSceneAudio, Realistic, Unrealistic, Chaos
-from tdw_scene_size import TDWSceneSize, StandardSize, SmallSize, RandomSize
+from tdw_scene_size import StandardSize, SmallSize, RandomSize
 from weighted_collection import WeightedCollection
 from numpy.random import RandomState
 import numpy as np
@@ -416,7 +416,7 @@ class TDWScene(Scene):
     _RNG = RandomState(0)
 
     def __init__(self):
-        self._room_size: TDWSceneSize = TDWScene._ROOM_SIZES.get()().get_size()
+        self._room_size: Tuple[int, int] = TDWScene._ROOM_SIZES.get()().get_size()
         rp: TDWSceneAudio = TDWScene._REVERB_PARAMETERS.get()()
         self._audio_material = rp.get_audio_material()
         self._reverb: dict = rp.get_command()
