@@ -172,7 +172,7 @@ class AudioDataset(Controller):
 
         while count < num_total:
             obj_name = models[model_index]
-            filename = output_dir.joinpath(material + "_" + TDWUtils.zero_padding(count, 4) + ".wav")
+            filename = output_dir.joinpath(TDWUtils.zero_padding(count, 4) + ".wav")
             # Get the expected output path.
             output_path = output_dir.joinpath(filename)
 
@@ -496,7 +496,7 @@ class AudioDataset(Controller):
 if __name__ == "__main__":
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--dir", type=str, default="D:/audio_dataset", help="Output directory")
+    parser.add_argument("--dir", type=str, default="D:/tdw_audio_dataset", help="Output directory")
     args = parser.parse_args()
 
     a = AudioDataset(output_dir=Path(args.dir))

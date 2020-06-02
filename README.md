@@ -1,4 +1,4 @@
-# `audio_dataset.py`
+# tdw_sound20k
 
 **Seth Alter**
 
@@ -16,8 +16,9 @@ Each sub-set contains the same number of files as Sound20K (meaning that the tot
 ## Requirements
 
 1. [fmedia](https://stsaz.github.io/fmedia/) (Follow the installation instructions closely)
-2. Audio drivers. 
-3. Access to TDW's `models_full.json` library
+2. Audio drivers
+3. TDW
+4. Access to TDW's `models_full.json` library
 
 Additionally, `audio_dataset.py` has only been tested on Windows 10, and might not work on other platforms.
 
@@ -38,7 +39,8 @@ output_directory
 ....TDW/
 ```
 
-**results.db** is a database containing metadata of every trial in the dataset. Use sqlite to read it.
+- **results.db** is a database containing metadata of every trial in the dataset. Use sqlite to read it.
+- **Sound20K/** is meant to replicate the original Sound20K dataset; **TDW/** expands upon it with additional models and scenarios. See below for more information.
 
 ## How to Use the Sound20K Dataset
 
@@ -52,6 +54,49 @@ python3 convert_sound20k_files.py --src <sound20k_source_directory> --dest <outp
 ```
 
 This will copy and rename each _relevant_ file into the `--dest` directory.
+
+## Labels
+
+Files are labeled by directory; each directory is an _audio material_.
+
+There are six materials:
+
+1. ceramic
+2. glass
+3. metal
+4. hardwood
+5. wood
+6. cardboard
+
+The labeling system is consistent between the TDW-generated dataset (`Sound20K/` and `TDW/`) and the converted Sound20K dataset.
+
+**Example:**
+
+```
+sound20k_audio_dataset/
+....ceramic/
+........0000.wav
+........0001.wav
+........(etc.)
+....glass/
+........(etc.)
+
+tdw_audio_dataset/
+....TDW/
+........ceramic/
+............0000.wav
+............0001.wav
+............(etc.)
+........glass/
+............(etc.)
+....Sound20K/
+........ceramic/
+............0000.wav
+............0001.wav
+............(etc.)
+........glass/
+............(etc.)
+```
 
 ## What It Does
 
