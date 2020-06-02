@@ -81,29 +81,34 @@ class AudioDataset(Controller):
 
         dir_util.remove_tree(str(self.output_dir.resolve()))
 
-    def process_sub_set(self, name: str, wnids_file: str, init_commands: List[dict], scenes: List[Scene]) -> None:
+    def process_sub_set(self, name: str, models_mat_file: str, init_commands: List[dict], scenes: List[Scene]) -> None:
         """
         Process a sub-set of the complete dataset (e.g. all of Sound20K).
 
         :param name: The name of the sub-set.
-        :param wnids_file: The wnids data filename.
+        :param models_mat_file: The models per material data filename.
         :param init_commands: The commands used to initialize the entire process (this is sent only once).
         :param scenes: The scenes that can be loaded.
         """
 
         print(name)
         # Load models by wnid.
-        wnids = loads(Path(f"models/{wnids_file}.json").read_text(encoding="utf-8"))
-        num_per_wnid = int(self.total / len(wnids))
+        materials: Dict[str, List[str]] = loads(Path(f"models/{models_mat_file}.json").read_text(encoding="utf-8"))
+        num_per_material = int(self.total / len(materials))
 
         # Load the scene.
         self.communicate(init_commands)
 
         pbar = tqdm(total=self.total)
 
-        for wnid in wnids:
-            pbar.set_description(wnid)
-            self.process_wnid(self.output_dir.joinpath(name), scenes, wnids[wnid], num_per_wnid, pbar)
+        for material in materials:
+            pbar.set_description(material)
+            self.process_material(root_dir=self.output_dir.joinpath(name),
+                                  scenes=scenes,
+                                  material=material,
+                                  models=materials[material],
+                                  num_total=num_per_material,
+                                  pbar=pbar)
         pbar.close()
 
     def sound20k_set(self) -> None:
@@ -130,19 +135,20 @@ class AudioDataset(Controller):
                                   {"$type": "add_environ_audio_sensor"},
                                   {"$type": "toggle_image_sensor"}]
 
-        self.process_sub_set("Sound20K", "wnids_sound20k", sound20k_init_commands, get_sound20k_scenes())
+        self.process_sub_set("Sound20K", "models_per_material_sound20k", sound20k_init_commands, get_sound20k_scenes())
 
     def tdw_set(self) -> None:
-        self.process_sub_set("TDW", "wnids_tdw", [], get_tdw_scenes())
+        self.process_sub_set("TDW", "models_per_material_tdw", [], get_tdw_scenes())
 
-    def process_wnid(self, root_dir: Path, scenes: List[Scene], models: List[Dict[str, str]], num_total: int, pbar: Optional[tqdm]) -> None:
+    def process_material(self, root_dir: Path, scenes: List[Scene], models: List[str], material: str, num_total: int, pbar: Optional[tqdm]) -> None:
         """
-        Generate .wav files from all models in the category.
+        Generate .wav files from all models with the material.
 
         :param root_dir: The root output directory.
         :param scenes: The scenes that a trial can use.
         :param models: The names of the models in the category and their libraries.
         :param num_total: The total number of files to generate for this category.
+        :param material: The name of the material.
         :param pbar: The progress bar.
         """
 
@@ -160,16 +166,21 @@ class AudioDataset(Controller):
         # The scene being used to generate files.
         scene_index = 0
 
+        output_dir = root_dir.joinpath(material)
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True)
+
         while count < num_total:
-            output_path, record = self._get_output_path(obj_name=models[model_index]["name"],
-                                                        obj_library=models[model_index]["library"],
-                                                        file_count=model_count,
-                                                        root_dir=root_dir)
+            obj_name = models[model_index]
+            filename = output_dir.joinpath(material + "_" + TDWUtils.zero_padding(count, 4) + ".wav")
+            # Get the expected output path.
+            output_path = output_dir.joinpath(filename)
+
             # Do a trial if the file doesn't exist yet.
             if not output_path.exists():
                 try:
                     self.trial(scene=scenes[scene_index],
-                               record=record,
+                               record=self.libs[self.object_info[models[model_index]].library].get_record(obj_name),
                                output_path=output_path,
                                scene_index=scene_index)
                 finally:
@@ -427,25 +438,6 @@ class AudioDataset(Controller):
             return self.object_info[object_ids[o_id]].material, self.object_info[object_ids[o_id]].amp
         else:
             return self.object_info[drop_name].material, self.object_info[drop_name].amp
-
-    def _get_output_path(self, root_dir: Path, obj_name: str, obj_library: str, file_count: int) -> Tuple[Path, ModelRecord]:
-        """
-        :param obj_name: The model name.
-        :param obj_library: The model record's metadata library.
-        :param file_count: The number of files with this model so far.
-        :param root_dir: The root output directory.
-
-        :return: The path to the next file to be written.
-        """
-
-        record = self.libs[obj_library].get_record(obj_name)
-
-        output_dir = root_dir.joinpath(record.wnid)
-        if not output_dir.exists():
-            output_dir.mkdir(parents=True)
-
-        filename = output_dir.joinpath(obj_name + "_" + TDWUtils.zero_padding(file_count, 4) + ".wav")
-        return output_dir.joinpath(filename), record
 
     @staticmethod
     def _get_transforms(resp: List[bytes]) -> Transforms:

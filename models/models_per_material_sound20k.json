@@ -1,0 +1,50 @@
+{
+  "cardboard": [
+    "034_vray",
+    "arflex_strips_sofa",
+    "b04_yamaha_portable_speaker",
+    "f10_apple_iphone_4",
+    "iphone_5_vr_white",
+    "vray_004"
+  ],
+  "ceramic": [
+    "cgaxis_models_22_33_vray",
+    "elephant_bowl",
+    "serving_bowl",
+    "small_table_green_marble",
+    "jug02",
+    "vase_06"
+  ],
+  "glass": [
+    "b04_bottle-2014-2018",
+    "b04_ramlosa_bottle_2015_vray",
+    "b04_whiskeybottle",
+    "b06_vodka",
+    "moet_chandon_bottle_vray",
+    "glass_table_round"
+  ],
+  "metal": [
+    "b006_clyde-clock_vray",
+    "b03_boat_fishing_02_null_11",
+    "b04_sword10",
+    "b05_candollarcoin",
+    "b05_knife_03",
+    "cr-96_bench",
+    "metal_lab_shelf",
+    "fetap611_telephone_(max_2011___v-ray)",
+    "gas_stove",
+    "mailbox_toon_2013",
+    "spunlight_designermesh_lamp"
+  ],
+  "wood": [
+    "clock",
+    "b05_amati_red_violin",
+    "birdhouse_0",
+    "birdhouse_1",
+    "display_cabinet_1_2012",
+    "display_cabinet_2_2012",
+    "live_edge_coffee_table",
+    "microphone",
+    "skateboard_1"
+  ]
+}
