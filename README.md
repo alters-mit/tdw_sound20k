@@ -22,6 +22,19 @@ Each sub-set contains the same number of files as Sound20K (meaning that the tot
 
 Additionally, `audio_dataset.py` has only been tested on Windows 10, and might not work on other platforms.
 
+#### Sound20K
+
+If you want to compare the dataset created by `audio_dataset.py` to the original Sound20K dataset, you will need to convert the original Sound20K dataset, because it isn't labeled with useful object classification information and contains many files that aren't needed.
+
+1. Download and extract [this file](http://sound.csail.mit.edu/data/sound-20k.tar.gz).
+2. Run this script:
+
+```python
+python3 convert_sound20k_files.py --src <sound20k_source_directory> --dest <output_directory>
+```
+
+This will copy and rename each _relevant_ file into the `--dest` directory.
+
 ## Usage
 
 ```python
@@ -41,19 +54,6 @@ output_directory
 
 - **results.db** is a database containing metadata of every trial in the dataset. Use sqlite to read it.
 - **Sound20K/** is meant to replicate the original Sound20K dataset; **TDW/** expands upon it with additional models and scenarios. See below for more information.
-
-## How to Use the Sound20K Dataset
-
-If you want to compare the dataset created by `audio_dataset.py` to the original Sound20K dataset, you will need to convert the original Sound20K dataset, because it isn't labeled with useful object classification information and contains many files that aren't needed.
-
-1. Download and extract [this file](http://sound.csail.mit.edu/data/sound-20k.tar.gz).
-2. Run this script:
-
-```python
-python3 convert_sound20k_files.py --src <sound20k_source_directory> --dest <output_directory>
-```
-
-This will copy and rename each _relevant_ file into the `--dest` directory.
 
 ## Labels
 
@@ -122,7 +122,7 @@ Most models are in TDW's default model libraries. A few are custom models, some 
 
 ## Sound20K
 
-In the Sound20K sub-set, the dropped object is selected from a list derived from `models/wnids_sound20k.json`. The scene is selected from one of 9 scenes, each of which are variants of an empty room with a wood floor:
+In the Sound20K sub-set, the dropped object is selected from a list derived from `models/models_per_material_sound20k.json`. The scene is selected from one of 9 scenes, each of which are variants of an empty room with a wood floor:
 
 | Scene                  | Description                                                  |
 | ---------------------- | ------------------------------------------------------------ |
@@ -140,7 +140,7 @@ Scenes are always selected evenly per model; thus if there will be 90 audio file
 
 ## TDW
 
-In the TDW sub-set, the dropped object is selected from a list derived from `models/wnids_tdw.json`. There are only 2 types of scenes:
+In the TDW sub-set, the dropped object is selected from a list derived from `models/models_per_material_tdw.json`. There are 2 types of scenes:
 
 | Scene        | Description                                                  |
 | ------------ | ------------------------------------------------------------ |
