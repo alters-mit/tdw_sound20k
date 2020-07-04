@@ -1,9 +1,5 @@
 # tdw_sound20k
 
-**Seth Alter**
-
-**May 2020**
-
 ## Overview
 
 `audio_dataset.py` generates a dataset of audio files using TDW. This dataset is meant to be compared to the [Sound20K dataset](https://github.com/ztzhang/SoundSynth), and is split into two "sub-sets":
