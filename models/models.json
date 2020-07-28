@@ -65,9 +65,9 @@
                 }
             ],
             "urls": {
-                "Darwin": "https://s3.amazonaws.com/tdw_test_dev/models/osx_2018/b03_boat_fishing_02_null_11",
-                "Linux": "https://s3.amazonaws.com/tdw_test_dev/models/linux_2018/b03_boat_fishing_02_null_11",
-                "Windows": "https://s3.amazonaws.com/tdw_test_dev/models/windows_2018/b03_boat_fishing_02_null_11"
+                "Darwin": "https://tdw-private.s3.amazonaws.com/models/osx/2018-2019.1/b03_boat_fishing_02_null_11",
+                "Linux": "https://tdw-private.s3.amazonaws.com/models/linux/2018-2019.1/b03_boat_fishing_02_null_11",
+                "Windows": "https://tdw-private.s3.amazonaws.com/models/windows/2018-2019.1/b03_boat_fishing_02_null_11"
             },
             "wcategory": "boat",
             "wnid": "n02858304"
@@ -339,9 +339,9 @@
                 }
             ],
             "urls": {
-                "Darwin": "https://s3.amazonaws.com/tdw_test_dev/models/osx_2018/int_kitchen_accessories_le_creuset_bowl_30cm",
-                "Linux": "https://s3.amazonaws.com/tdw_test_dev/models/linux_2018/int_kitchen_accessories_le_creuset_bowl_30cm",
-                "Windows": "https://s3.amazonaws.com/tdw_test_dev/models/windows_2018/int_kitchen_accessories_le_creuset_bowl_30cm"
+                "Darwin": "https://tdw-private.s3.amazonaws.com/models/osx/2018-2019.1/int_kitchen_accessories_le_creuset_bowl_30cm",
+                "Linux": "https://tdw-private.s3.amazonaws.com/models/linux/2018-2019.1/int_kitchen_accessories_le_creuset_bowl_30cm",
+                "Windows": "https://tdw-private.s3.amazonaws.com/models/windows/2018-2019.1/int_kitchen_accessories_le_creuset_bowl_30cm"
             },
             "wcategory": "bowl (previously dish)",
             "wnid": "n03206908"

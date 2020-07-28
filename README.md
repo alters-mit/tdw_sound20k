@@ -13,8 +13,8 @@ Each sub-set contains the same number of files as Sound20K (meaning that the tot
 
 1. [fmedia](https://stsaz.github.io/fmedia/) (Follow the installation instructions closely)
 2. Audio drivers
-3. TDW
-4. Access to TDW's `models_full.json` library
+3. [TDW](https://github.com/threedworld-mit/tdw) 
+4. Access to TDW's [full model library](https://github.com/threedworld-mit/tdw/blob/master/Documentation/misc_frontend/models_full.md).
 
 Additionally, `audio_dataset.py` has only been tested on Windows 10, and might not work on other platforms.
 
